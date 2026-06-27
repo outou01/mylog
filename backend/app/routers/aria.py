@@ -1,3 +1,4 @@
+import time
 from datetime import date, timedelta
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
@@ -8,6 +9,9 @@ from app.database import get_db
 from app.models import DailyLog
 
 router = APIRouter(prefix="/aria", tags=["aria"])
+
+_cache: dict = {}  # key -> (result, timestamp)
+_CACHE_TTL = 60  # seconds
 
 
 class AriaMessage(BaseModel):
@@ -128,8 +132,15 @@ def _ai_aria(log: DailyLog | None, recent_logs: list[DailyLog]) -> AriaMessage:
 @router.get("/message", response_model=AriaMessage)
 def get_aria_message(db: Session = Depends(get_db)):
     today = date.today()
-    log = db.query(DailyLog).filter(DailyLog.date == today).first()
+    cache_key = today.isoformat()
+    now = time.time()
 
+    if cache_key in _cache:
+        result, ts = _cache[cache_key]
+        if now - ts < _CACHE_TTL:
+            return result
+
+    log = db.query(DailyLog).filter(DailyLog.date == today).first()
     recent_logs = (
         db.query(DailyLog)
         .filter(DailyLog.date >= today - timedelta(days=7), DailyLog.date < today)
@@ -138,7 +149,10 @@ def get_aria_message(db: Session = Depends(get_db)):
     )
 
     try:
-        return _ai_aria(log, recent_logs)
+        result = _ai_aria(log, recent_logs)
     except Exception as e:
         print(f"[Aria] AI error: {e}")
-        return _fallback(log, recent_logs)
+        result = _fallback(log, recent_logs)
+
+    _cache[cache_key] = (result, now)
+    return result
