@@ -4,12 +4,29 @@ import "./QuickLog.css";
 
 const MOOD_LABEL: Record<number, string> = { 1: "😞 かなり悪い", 2: "😕 悪い", 3: "😐 普通", 4: "🙂 良い", 5: "😄 かなり良い" };
 
-type SpeechRecognitionType = typeof window extends { SpeechRecognition: infer T } ? T :
-  typeof window extends { webkitSpeechRecognition: infer T } ? T : never;
+interface ISpeechRecognition extends EventTarget {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  onresult: ((event: SpeechRecognitionEvent) => void) | null;
+  onend: (() => void) | null;
+  onerror: (() => void) | null;
+  start(): void;
+  stop(): void;
+}
 
-const SpeechRecognition =
-  (window as unknown as { SpeechRecognition?: SpeechRecognitionType }).SpeechRecognition ||
-  (window as unknown as { webkitSpeechRecognition?: SpeechRecognitionType }).webkitSpeechRecognition;
+interface SpeechRecognitionEvent {
+  results: SpeechRecognitionResultList;
+}
+
+declare global {
+  interface Window {
+    SpeechRecognition?: new () => ISpeechRecognition;
+    webkitSpeechRecognition?: new () => ISpeechRecognition;
+  }
+}
+
+const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
 
 interface Props {
   onRegistered?: () => void;
@@ -21,7 +38,7 @@ export default function QuickLog({ onRegistered }: Props) {
   const [parsing, setParsing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [listening, setListening] = useState(false);
-  const recognitionRef = useRef<InstanceType<SpeechRecognitionType> | null>(null);
+  const recognitionRef = useRef<ISpeechRecognition | null>(null);
   const [parseError, setParseError] = useState("");
   const [submitError, setSubmitError] = useState("");
   const [done, setDone] = useState(false);
@@ -64,7 +81,7 @@ export default function QuickLog({ onRegistered }: Props) {
     setParsed((p) => p ? { ...p, [key]: value } : p);
 
   const handleVoice = () => {
-    if (!SpeechRecognition) {
+    if (!SpeechRecognitionCtor) {
       alert("このブラウザは音声入力に対応していません。Chromeをお使いください。");
       return;
     }
@@ -72,7 +89,7 @@ export default function QuickLog({ onRegistered }: Props) {
       recognitionRef.current?.stop();
       return;
     }
-    const recognition = new SpeechRecognition();
+    const recognition = new SpeechRecognitionCtor();
     recognition.lang = "ja-JP";
     recognition.continuous = true;
     recognition.interimResults = true;
