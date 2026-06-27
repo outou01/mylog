@@ -155,5 +155,8 @@ def get_aria_message(db: Session = Depends(get_db)):
             return _openai_aria(log, recent_logs)
         else:
             return _fallback(log, recent_logs)
-    except Exception:
+    except Exception as e:
+        import traceback
+        print(f"[Aria] OpenAI error: {e}")
+        traceback.print_exc()
         return _fallback(log, recent_logs)
