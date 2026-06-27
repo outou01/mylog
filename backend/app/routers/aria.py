@@ -28,15 +28,15 @@ def _fallback(log: DailyLog | None, recent_logs: list[DailyLog]) -> AriaMessage:
 
     # 睡眠
     if log.sleep_hours < 5.5:
-        parts.append(f"睡眠が{log.sleep_hours}時間というのは、正直かなり少ないです。体は正直で、積み重なると判断力や気力に響いてきます。今夜だけでも早く横になってほしいです。")
+        parts.append(f"ご主人様、睡眠が{log.sleep_hours}時間というのは正直かなり少ないです。体は正直で、積み重なると判断力や気力に響いてきます。今夜だけでも早く横になってほしいです。")
         mood = "worried"
     elif log.sleep_hours >= 7:
-        parts.append(f"睡眠{log.sleep_hours}時間、しっかり確保できましたね。")
+        parts.append(f"ご主人様、睡眠{log.sleep_hours}時間しっかり確保できましたね。アリアも安心です！")
         mood = "happy"
 
     # 残業
     if log.overtime_hours >= 3:
-        parts.append(f"残業{log.overtime_hours}時間は消耗します。仕事の量は変えられなくても、今夜の過ごし方で回復できます。")
+        parts.append(f"残業{log.overtime_hours}時間は消耗します、ご主人様。仕事の量は変えられなくても、今夜の過ごし方で回復できます。")
         mood = "worried"
 
     # 達成
@@ -48,23 +48,23 @@ def _fallback(log: DailyLog | None, recent_logs: list[DailyLog]) -> AriaMessage:
     if log.did_code:
         achievements.append("開発")
     if achievements:
-        parts.append(f"{'と'.join(achievements)}までやり切ったんですね。それは本当にすごいことです。")
+        parts.append(f"{'と'.join(achievements)}までやり切ったんですね、ご主人様。それは本当にすごいことです！")
         mood = "proud"
 
     # 気分
     if log.mood_score <= 2:
-        parts.append("気分スコアが低い日は、無理に前向きにならなくていいと思います。ただそこにいるだけで、ちゃんと記録していることがアリアには伝わっています。")
+        parts.append("気分スコアが低い日は、無理に前向きにならなくていいと思います、ご主人様。ただそこにいるだけで、ちゃんと記録していることがアリアには伝わっています。")
         mood = "worried"
 
     # 連続パターンを見る
     if len(recent_logs) >= 3:
         workout_streak = sum(1 for l in recent_logs[-3:] if l.did_workout)
         if workout_streak == 3:
-            parts.append("ここ3日連続で筋トレしているの、アリアはちゃんと見てましたよ。")
+            parts.append("ここ3日連続で筋トレしているの、アリアはちゃんと見てましたよ、ご主人様！")
             mood = "proud"
 
     if not parts:
-        parts.append("今日も記録してくれましたね。それだけで自分と向き合えている証拠です。")
+        parts.append("ご主人様、今日も記録してくれましたね。それだけで自分と向き合えている証拠です。")
         mood = "happy"
 
     return AriaMessage(message=" ".join(parts[:2]), mood=mood)
