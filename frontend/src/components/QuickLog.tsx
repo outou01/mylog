@@ -91,13 +91,23 @@ export default function QuickLog({ onRegistered }: Props) {
     }
     const recognition = new SpeechRecognitionCtor();
     recognition.lang = "ja-JP";
-    recognition.continuous = false;
-    recognition.interimResults = false;
+    recognition.continuous = true;
+    recognition.interimResults = true;
     recognitionRef.current = recognition;
 
+    const baseText = text;
+
     recognition.onresult = (event: { results: SpeechRecognitionResultList }) => {
-      const transcript = event.results[0][0].transcript;
-      setText((prev) => prev ? prev + "。" + transcript : transcript);
+      let finals = "";
+      let interim = "";
+      for (let i = 0; i < event.results.length; i++) {
+        if (event.results[i].isFinal) {
+          finals += event.results[i][0].transcript;
+        } else {
+          interim += event.results[i][0].transcript;
+        }
+      }
+      setText(baseText + finals + interim);
       setParsed(null);
       setDone(false);
     };
