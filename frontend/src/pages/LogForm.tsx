@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { createLog, DailyLogCreate } from "../api/client";
+import QuickLog from "../components/QuickLog";
 import "./LogForm.css";
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -42,6 +43,15 @@ export default function LogForm() {
   return (
     <div className="log-form-page">
       <h1 className="page-title">今日のログを登録</h1>
+
+      <div className="card" style={{ marginBottom: "1.5rem" }}>
+        <QuickLog onRegistered={() => navigate("/")} />
+      </div>
+
+      <div className="form-divider">
+        <span>または手動で入力</span>
+      </div>
+
       <form className="card log-form" onSubmit={handleSubmit}>
         <div className="form-row">
           <label>日付</label>

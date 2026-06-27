@@ -42,7 +42,21 @@ export interface DailyLogCreate {
   memo: string;
 }
 
+export interface QuickLogParsed {
+  date: string;
+  sleep_hours: number;
+  overtime_hours: number;
+  mood_score: number;
+  did_workout: boolean;
+  did_create: boolean;
+  did_code: boolean;
+  drank_alcohol: boolean;
+  memo: string;
+}
+
 export const fetchLogs = () => api.get<DailyLog[]>("/daily-logs").then((r) => r.data);
 export const fetchLatestLog = () => api.get<DailyLog>("/daily-logs/latest").then((r) => r.data);
 export const createLog = (data: DailyLogCreate) => api.post<DailyLog>("/daily-logs", data).then((r) => r.data);
 export const generateReview = (id: number) => api.post<AiReview>(`/ai-review/${id}`).then((r) => r.data);
+export const parseQuickLog = (text: string) =>
+  api.post<QuickLogParsed>("/quick-log/parse", { text }).then((r) => r.data);

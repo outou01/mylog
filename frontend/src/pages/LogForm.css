@@ -1,5 +1,21 @@
 .log-form-page { max-width: 560px; margin: 0 auto; }
 
+.form-divider {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+.form-divider::before,
+.form-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
 .page-title {
   font-family: var(--font-mono);
   color: var(--accent);

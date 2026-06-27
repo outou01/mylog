@@ -1,0 +1,119 @@
+.quick-log {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.ql-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.ql-badge {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--accent2);
+  border: 1px solid var(--accent2);
+  padding: 2px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.1em;
+}
+
+.ql-hint {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.ql-textarea {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 0.75rem;
+  font-size: 0.9rem;
+  resize: vertical;
+  outline: none;
+  line-height: 1.6;
+  width: 100%;
+}
+.ql-textarea:focus { border-color: var(--accent2); }
+
+.ql-parse-btn { align-self: flex-start; }
+
+.ql-error { color: var(--red); font-size: 0.85rem; }
+.ql-success { color: var(--green); font-size: 0.85rem; font-family: var(--font-mono); }
+
+.ql-preview {
+  border: 1px solid var(--accent2);
+  border-radius: 8px;
+  padding: 1.25rem;
+  background: rgba(124, 58, 237, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.ql-preview-title {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--accent2);
+  margin-bottom: 0.25rem;
+}
+
+.ql-fields { display: flex; flex-direction: column; gap: 0.9rem; }
+
+.ql-field { display: flex; flex-direction: column; gap: 0.3rem; }
+.ql-field label { font-size: 0.8rem; color: var(--text-muted); }
+.ql-val { color: var(--accent); font-family: var(--font-mono); }
+
+.ql-field input[type="date"],
+.ql-field textarea {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 0.4rem 0.6rem;
+  font-size: 0.9rem;
+  outline: none;
+  width: 100%;
+}
+.ql-field input[type="date"]:focus,
+.ql-field textarea:focus { border-color: var(--accent); }
+.ql-field textarea { resize: vertical; }
+
+.ql-field input[type="range"] { accent-color: var(--accent2); width: 100%; }
+
+.ql-mood { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+.ql-mood-btn {
+  width: 32px;
+  height: 32px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.ql-mood-btn.active { border-color: var(--accent2); color: var(--accent2); background: rgba(124,58,237,0.15); }
+.ql-mood-label { font-size: 0.85rem; color: var(--text-muted); margin-left: 0.25rem; }
+
+.ql-toggles { flex-direction: row; flex-wrap: wrap; gap: 0.5rem; }
+.ql-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.65rem;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: all 0.15s;
+}
+.ql-toggle input { display: none; }
+.ql-toggle.on { border-color: var(--green); color: var(--green); background: rgba(16,185,129,0.08); }
+
+.ql-register-btn { width: 100%; justify-content: center; padding: 0.65rem; }
