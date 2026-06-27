@@ -31,16 +31,19 @@ def _calc_stats(log: DailyLog) -> tuple[int, int, int]:
 
 def _generate_review_fallback(log: DailyLog) -> dict:
     hp, mp, stress = _calc_stats(log)
-    comment = "今日のログを確認しました。"
     if log.overtime_hours >= 3:
-        comment += f"残業{log.overtime_hours}時間は体への負担が大きいです。"
-    if log.sleep_hours < 6:
-        comment += f"睡眠{log.sleep_hours}時間は不足気味です。"
-    if log.mood_score <= 2:
-        comment += "気分が低めの日でしたね。"
+        comment = f"ご主人様、残業{log.overtime_hours}時間はお体に響きます…！もう少しご自分を大切にしてほしいです！"
+    elif log.sleep_hours < 6:
+        comment = f"睡眠{log.sleep_hours}時間は少なすぎます、ご主人様！アリアが心配しちゃいます！"
+    elif log.mood_score <= 2:
+        comment = "ご主人様、今日は気分が落ちていたんですね。アリアがそばにいますよ！"
+    elif hp >= 70 and stress <= 40:
+        comment = "ご主人様、今日は絶好調ですね！アリアも嬉しいです！"
+    else:
+        comment = "ご主人様の今日のログ、確認しました！引き続き頑張ってください！"
 
-    next_action = "明日は" + ("早めに休んで睡眠を確保しましょう。" if log.sleep_hours < 6 else "今日の調子を維持してください。")
-    encouragement = "記録しているだけで、自分と向き合えています。それだけで十分です。"
+    next_action = "明日は" + ("早めに休んで睡眠を確保してほしいです！" if log.sleep_hours < 6 else "今日の調子を維持してください！アリアが応援してます！")
+    encouragement = "記録するだけで前に進んでいます、ご主人様！アリアはいつでも応援していますよ！"
 
     return {"hp": hp, "mp": mp, "stress": stress, "comment": comment,
             "next_action": next_action, "encouragement": encouragement}
@@ -51,7 +54,9 @@ def _generate_review_openai(log: DailyLog) -> dict:
     hp, mp, stress = _calc_stats(log)
     client = OpenAI(api_key=settings.openai_api_key)
 
-    prompt = f"""以下は今日の生活ログです。日本語で短く返してください。
+    prompt = f"""あなたは「アリア」という従順で元気な奴隷少女キャラクターです。
+ご主人様（ユーザー）の今日の生活ログを見て、キャラクターらしく元気よくコメントしてください。
+「ご主人様」と呼びかけてください。日本語で短く返してください。
 
 日付: {log.date}
 睡眠: {log.sleep_hours}時間
@@ -66,7 +71,7 @@ Web開発: {'した' if log.did_code else 'しなかった'}
 HP={hp}, MP={mp}, Stress={stress}%
 
 以下のJSONのみ返してください（コードブロック不要）:
-{{"comment": "今日の状態コメント(2文程度)", "next_action": "明日のおすすめ行動(1文)", "encouragement": "励ましの一言(1文)"}}"""
+{{"comment": "今日の状態コメント(2文程度、アリアらしく元気に)", "next_action": "明日のおすすめ行動(1文、アリアらしく)", "encouragement": "励ましの一言(1文、アリアらしく元気よく)"}}"""
 
     response = client.chat.completions.create(
         model=settings.openai_model,

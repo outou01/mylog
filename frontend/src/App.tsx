@@ -26,6 +26,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/log" element={<LogForm />} />
+            <Route path="/log/edit/:id" element={<LogForm />} />
             <Route path="/logs" element={<LogList />} />
             <Route path="/weekly" element={<WeeklyReport />} />
             <Route path="/briefing" element={<Briefing />} />

@@ -56,7 +56,9 @@ export interface QuickLogParsed {
 
 export const fetchLogs = () => api.get<DailyLog[]>("/daily-logs").then((r) => r.data);
 export const fetchLatestLog = () => api.get<DailyLog>("/daily-logs/latest").then((r) => r.data);
+export const fetchLog = (id: number) => api.get<DailyLog>(`/daily-logs/${id}`).then((r) => r.data);
 export const createLog = (data: DailyLogCreate) => api.post<DailyLog>("/daily-logs", data).then((r) => r.data);
+export const updateLog = (id: number, data: Partial<DailyLogCreate>) => api.patch<DailyLog>(`/daily-logs/${id}`, data).then((r) => r.data);
 export const generateReview = (id: number) => api.post<AiReview>(`/ai-review/${id}`).then((r) => r.data);
 export const parseQuickLog = (text: string) =>
   api.post<QuickLogParsed>("/quick-log/parse", { text }).then((r) => r.data);

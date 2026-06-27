@@ -130,7 +130,7 @@ export default function Dashboard() {
           )}
 
           <div className="dashboard-actions">
-            <Link to="/log" className="btn btn-primary">今日のログを更新</Link>
+            <Link to={`/log/edit/${log.id}`} className="btn btn-primary">今日のログを修正</Link>
             <Link to="/logs" className="btn btn-accent">ログ一覧を見る</Link>
           </div>
         </div>

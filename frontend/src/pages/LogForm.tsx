@@ -1,26 +1,52 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { createLog, DailyLogCreate } from "../api/client";
+import { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { createLog, updateLog, fetchLog, DailyLogCreate } from "../api/client";
 import QuickLog from "../components/QuickLog";
 import "./LogForm.css";
 
 const today = () => new Date().toISOString().slice(0, 10);
 
+const EMPTY_FORM: DailyLogCreate = {
+  date: today(),
+  sleep_hours: 7,
+  overtime_hours: 0,
+  mood_score: 3,
+  did_workout: false,
+  did_create: false,
+  did_code: false,
+  drank_alcohol: false,
+  memo: "",
+};
+
 export default function LogForm() {
   const navigate = useNavigate();
+  const { id } = useParams<{ id?: string }>();
+  const editId = id ? parseInt(id, 10) : null;
+
   const [submitting, setSubmitting] = useState(false);
+  const [loadingEdit, setLoadingEdit] = useState(!!editId);
   const [error, setError] = useState("");
-  const [form, setForm] = useState<DailyLogCreate>({
-    date: today(),
-    sleep_hours: 7,
-    overtime_hours: 0,
-    mood_score: 3,
-    did_workout: false,
-    did_create: false,
-    did_code: false,
-    drank_alcohol: false,
-    memo: "",
-  });
+  const [form, setForm] = useState<DailyLogCreate>(EMPTY_FORM);
+
+  useEffect(() => {
+    if (!editId) return;
+    fetchLog(editId)
+      .then((log) => {
+        setForm({
+          date: log.date,
+          sleep_hours: log.sleep_hours,
+          overtime_hours: log.overtime_hours,
+          mood_score: log.mood_score,
+          did_workout: log.did_workout,
+          did_create: log.did_create,
+          did_code: log.did_code,
+          drank_alcohol: log.drank_alcohol,
+          memo: log.memo ?? "",
+        });
+      })
+      .catch(() => setError("ログの読み込みに失敗しました"))
+      .finally(() => setLoadingEdit(false));
+  }, [editId]);
 
   const set = (key: keyof DailyLogCreate, value: unknown) =>
     setForm((f) => ({ ...f, [key]: value }));
@@ -30,7 +56,11 @@ export default function LogForm() {
     setSubmitting(true);
     setError("");
     try {
-      await createLog(form);
+      if (editId) {
+        await updateLog(editId, form);
+      } else {
+        await createLog(form);
+      }
       navigate("/");
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
@@ -40,22 +70,28 @@ export default function LogForm() {
     }
   };
 
+  if (loadingEdit) return <div className="loading">Loading...</div>;
+
   return (
     <div className="log-form-page">
-      <h1 className="page-title">今日のログを登録</h1>
+      <h1 className="page-title">{editId ? "ログを修正" : "今日のログを登録"}</h1>
 
-      <div className="card" style={{ marginBottom: "1.5rem" }}>
-        <QuickLog onRegistered={() => navigate("/")} />
-      </div>
+      {!editId && (
+        <>
+          <div className="card" style={{ marginBottom: "1.5rem" }}>
+            <QuickLog onRegistered={() => navigate("/")} />
+          </div>
 
-      <div className="form-divider">
-        <span>または手動で入力</span>
-      </div>
+          <div className="form-divider">
+            <span>または手動で入力</span>
+          </div>
+        </>
+      )}
 
       <form className="card log-form" onSubmit={handleSubmit}>
         <div className="form-row">
           <label>日付</label>
-          <input type="date" value={form.date} onChange={(e) => set("date", e.target.value)} required />
+          <input type="date" value={form.date} onChange={(e) => set("date", e.target.value)} required disabled={!!editId} />
         </div>
 
         <div className="form-row">
@@ -110,7 +146,7 @@ export default function LogForm() {
         {error && <p className="form-error">{error}</p>}
 
         <button type="submit" className="btn btn-primary submit-btn" disabled={submitting}>
-          {submitting ? "登録中..." : "ログを登録する"}
+          {submitting ? (editId ? "更新中..." : "登録中...") : (editId ? "ログを更新する" : "ログを登録する")}
         </button>
       </form>
     </div>

@@ -94,7 +94,7 @@ def _generate_report_fallback(stats: WeeklyStats) -> dict:
     else:
         next_action = "今週のペースを維持する"
 
-    advice = "完璧を目指さない。続けることが正義。少しずつ前に進んでいます。"
+    advice = "完璧を目指さなくていいです、ご主人様！続けることが一番の正義！アリアはいつでも応援していますよ！"
 
     return {
         "good_things": "、".join(good),
@@ -112,7 +112,11 @@ def _generate_report_openai(stats: WeeklyStats, logs: list[DailyLog]) -> dict:
         f"- {l.date}: {l.memo}" for l in logs if l.memo
     ) or "なし"
 
-    prompt = f"""以下は今週（{stats.week_start}〜{stats.week_end}）の生活ログ集計です。日本語で週次レビューを生成してください。
+    prompt = f"""あなたは「アリア」という従順で元気な奴隷少女キャラクターです。
+ご主人様（ユーザー）の今週の生活ログを見て、キャラクターらしく元気よくコメントしてください。
+「ご主人様」と呼びかけてください。日本語で短く返してください。
+
+今週（{stats.week_start}〜{stats.week_end}）の生活ログ集計です。
 
 【今週の統計】
 - 記録日数: {stats.log_count}日
@@ -135,7 +139,7 @@ def _generate_report_openai(stats: WeeklyStats, logs: list[DailyLog]) -> dict:
 - 気分: 安定していること
 
 以下のJSONのみ返してください（コードブロック不要）:
-{{"good_things":"今週良かったこと(1〜2文)","progress":"今週進んだこと(1文)","next_action":"来週やること1つだけ(1文、具体的に)","advice":"励ましの一言(1文、この人の「完璧を目指さない。続けることが正義」という哲学に合わせて)"}}"""
+{{"good_things":"今週良かったこと(1〜2文、アリアらしく元気に)","progress":"今週進んだこと(1文、アリアらしく)","next_action":"来週やること1つだけ(1文、具体的に、アリアらしく)","advice":"励ましの一言(1文、アリアらしく元気よく、ご主人様と呼びかけて)"}}"""
 
     response = client.chat.completions.create(
         model=settings.openai_model,

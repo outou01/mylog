@@ -98,13 +98,13 @@ def _ai_advice(stats, theme_text: str | None, last_action: str | None, logs: lis
 def _fallback_advice(stats, last_action: str | None) -> tuple[str, str]:
     parts = []
     if stats.avg_sleep < 6.5:
-        parts.append(f"睡眠が{stats.avg_sleep}時間と少なめでした。今週末は休息を優先してください。")
+        parts.append(f"ご主人様、睡眠が{stats.avg_sleep}時間と少なめでした…！今週末は休息を優先してほしいです！")
     if stats.create_days < 2:
-        parts.append("創作が少なかった週です。今週末30分だけでも手を動かしてみましょう。")
+        parts.append("今週は創作が少なかったですね、ご主人様！今週末30分だけでも手を動かしてみてください！")
     if stats.alcohol_days > 0:
-        parts.append(f"飲酒が{stats.alcohol_days}日ありました。今週末は飲まないと来週が楽になります。")
+        parts.append(f"飲酒が{stats.alcohol_days}日ありました！今週末は飲まないと来週が楽になりますよ、ご主人様！")
     if not parts:
-        parts.append("今週もよく動けました。今週末は無理せず自分のペースで進みましょう。")
+        parts.append("ご主人様、今週もよく動けました！今週末は無理せず自分のペースで進みましょう！アリアが応援してます！")
 
     if stats.create_days < stats.workout_days:
         suggested = "創作に1〜2時間だけ使う"
@@ -122,7 +122,9 @@ def _openai_advice(stats, theme_text: str | None, last_action: str | None, logs:
 
     memo_summary = "\n".join(f"- {l.date}: {l.memo}" for l in logs if l.memo) or "なし"
 
-    prompt = f"""以下は今週の生活ログ集計です。週末ブリーフィングとして、日本語で短く返してください。
+    prompt = f"""あなたは「アリア」という従順で元気な奴隷少女キャラクターです。
+ご主人様（ユーザー）の今週の生活ログを見て、週末ブリーフィングとして元気よくコメントしてください。
+「ご主人様」と呼びかけてください。日本語で短く返してください。
 
 【今月のテーマ】
 {theme_text or '未設定'}
@@ -142,7 +144,7 @@ def _openai_advice(stats, theme_text: str | None, last_action: str | None, logs:
 {last_action or 'なし'}
 
 以下のJSONのみ返してください（コードブロック不要）:
-{{"ai_advice":"今週を踏まえた一言コメント(2文以内、具体的に)","suggested_action":"今週末やること1つだけ(動詞で始まる短い文)"}}"""
+{{"ai_advice":"今週を踏まえた一言コメント(2文以内、アリアらしく元気に、ご主人様と呼びかけて)","suggested_action":"今週末やること1つだけ(動詞で始まる短い文)"}}"""
 
     res = client.chat.completions.create(
         model=settings.openai_model,
