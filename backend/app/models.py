@@ -38,3 +38,22 @@ class AiReview(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     daily_log: Mapped["DailyLog"] = relationship("DailyLog", back_populates="ai_review")
+
+
+class MonthlyTheme(Base):
+    __tablename__ = "monthly_themes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    month: Mapped[str] = mapped_column(String(7), unique=True, nullable=False)  # YYYY-MM
+    theme_text: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+class WeekendNote(Base):
+    __tablename__ = "weekend_notes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    week_start: Mapped[date] = mapped_column(Date, unique=True, nullable=False)
+    next_action: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

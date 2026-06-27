@@ -85,3 +85,27 @@ export interface WeeklyReport {
 
 export const fetchWeeklyReport = () =>
   api.get<WeeklyReport>("/weekly-report/latest").then((r) => r.data);
+
+export interface BriefingOut {
+  today: string;
+  month: string;
+  theme_text: string | null;
+  week_start: string;
+  week_end: string;
+  workout_days: number;
+  create_days: number;
+  code_days: number;
+  alcohol_days: number;
+  avg_sleep: number;
+  avg_mood: number;
+  last_next_action: string | null;
+  ai_advice: string;
+  suggested_action: string;
+}
+
+export const fetchWeekendBriefing = () =>
+  api.get<BriefingOut>("/briefing/weekend").then((r) => r.data);
+export const upsertMonthlyTheme = (theme_text: string) =>
+  api.post("/briefing/theme", { theme_text }).then((r) => r.data);
+export const saveWeekendNote = (next_action: string) =>
+  api.post("/briefing/note", { next_action }).then((r) => r.data);

@@ -3,6 +3,7 @@ import Dashboard from "./pages/Dashboard";
 import LogForm from "./pages/LogForm";
 import LogList from "./pages/LogList";
 import WeeklyReport from "./pages/WeeklyReport";
+import Briefing from "./pages/Briefing";
 import "./App.css";
 
 export default function App() {
@@ -16,6 +17,7 @@ export default function App() {
             <NavLink to="/log">Log入力</NavLink>
             <NavLink to="/logs">ログ一覧</NavLink>
             <NavLink to="/weekly">週次レポート</NavLink>
+            <NavLink to="/briefing">週末ブリーフィング</NavLink>
           </nav>
         </div>
       </header>
@@ -26,6 +28,7 @@ export default function App() {
             <Route path="/log" element={<LogForm />} />
             <Route path="/logs" element={<LogList />} />
             <Route path="/weekly" element={<WeeklyReport />} />
+            <Route path="/briefing" element={<Briefing />} />
           </Routes>
         </div>
       </main>
