@@ -60,3 +60,28 @@ export const createLog = (data: DailyLogCreate) => api.post<DailyLog>("/daily-lo
 export const generateReview = (id: number) => api.post<AiReview>(`/ai-review/${id}`).then((r) => r.data);
 export const parseQuickLog = (text: string) =>
   api.post<QuickLogParsed>("/quick-log/parse", { text }).then((r) => r.data);
+
+export interface WeeklyStats {
+  week_start: string;
+  week_end: string;
+  log_count: number;
+  avg_sleep: number;
+  avg_mood: number;
+  avg_overtime: number;
+  workout_days: number;
+  create_days: number;
+  code_days: number;
+  alcohol_days: number;
+  no_alcohol_days: number;
+}
+
+export interface WeeklyReport {
+  stats: WeeklyStats;
+  good_things: string;
+  progress: string;
+  next_action: string;
+  advice: string;
+}
+
+export const fetchWeeklyReport = () =>
+  api.get<WeeklyReport>("/weekly-report/latest").then((r) => r.data);

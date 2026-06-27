@@ -2,6 +2,7 @@ import { Routes, Route, NavLink } from "react-router-dom";
 import Dashboard from "./pages/Dashboard";
 import LogForm from "./pages/LogForm";
 import LogList from "./pages/LogList";
+import WeeklyReport from "./pages/WeeklyReport";
 import "./App.css";
 
 export default function App() {
@@ -14,6 +15,7 @@ export default function App() {
             <NavLink to="/" end>Dashboard</NavLink>
             <NavLink to="/log">Log入力</NavLink>
             <NavLink to="/logs">ログ一覧</NavLink>
+            <NavLink to="/weekly">週次レポート</NavLink>
           </nav>
         </div>
       </header>
@@ -23,6 +25,7 @@ export default function App() {
             <Route path="/" element={<Dashboard />} />
             <Route path="/log" element={<LogForm />} />
             <Route path="/logs" element={<LogList />} />
+            <Route path="/weekly" element={<WeeklyReport />} />
           </Routes>
         </div>
       </main>
