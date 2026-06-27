@@ -1,0 +1,72 @@
+.aria-wrap {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.75rem;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
+.aria-wrap.in {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.aria-avatar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  flex-shrink: 0;
+}
+
+.aria-face {
+  font-size: 1.6rem;
+  line-height: 1;
+  font-family: var(--font-mono);
+  transition: color 0.3s;
+}
+
+.aria-name {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.aria-bubble {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 12px 12px 12px 4px;
+  padding: 0.75rem 1rem;
+  position: relative;
+  max-width: 100%;
+}
+
+.aria-bubble::before {
+  content: "";
+  position: absolute;
+  left: -6px;
+  bottom: 10px;
+  width: 0;
+  height: 0;
+  border-top: 6px solid transparent;
+  border-bottom: 6px solid transparent;
+  border-right: 6px solid var(--border);
+}
+
+.aria-bubble::after {
+  content: "";
+  position: absolute;
+  left: -4px;
+  bottom: 11px;
+  width: 0;
+  height: 0;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-right: 5px solid var(--surface2);
+}
+
+.aria-text {
+  font-size: 0.9rem;
+  line-height: 1.7;
+  color: var(--text);
+}

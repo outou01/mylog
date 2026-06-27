@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { DailyLog, AiReview, fetchLatestLog, generateReview } from "../api/client";
 import StatBar from "../components/StatBar";
+import Aria from "../components/Aria";
 import "./Dashboard.css";
 
 const MOOD_LABEL: Record<number, string> = { 1: "最悪", 2: "悪い", 3: "普通", 4: "良い", 5: "最高" };
@@ -91,6 +92,9 @@ export default function Dashboard() {
         </div>
 
         <div className="ai-panel">
+          <div className="card aria-card">
+            <Aria />
+          </div>
           {review ? (
             <div className="card ai-card">
               <div className="ai-header">

@@ -109,3 +109,11 @@ export const upsertMonthlyTheme = (theme_text: string) =>
   api.post("/briefing/theme", { theme_text }).then((r) => r.data);
 export const saveWeekendNote = (next_action: string) =>
   api.post("/briefing/note", { next_action }).then((r) => r.data);
+
+export interface AriaMessage {
+  message: string;
+  mood: "happy" | "worried" | "proud" | "normal";
+}
+
+export const fetchAriaMessage = () =>
+  api.get<AriaMessage>("/aria/message").then((r) => r.data);
