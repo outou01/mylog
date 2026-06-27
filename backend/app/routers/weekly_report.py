@@ -1,10 +1,8 @@
-import json
 from datetime import date, timedelta
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.config import settings
 from app.database import get_db
 from app.models import DailyLog
 
@@ -82,7 +80,6 @@ def _generate_report_fallback(stats: WeeklyStats) -> dict:
     if not progress:
         progress.append("ログを記録し自分を振り返る習慣が続いている")
 
-    # next action
     if stats.avg_sleep < 6.5:
         next_action = "睡眠を7時間に戻すことを最優先にする"
     elif stats.workout_days < 2:
@@ -104,9 +101,8 @@ def _generate_report_fallback(stats: WeeklyStats) -> dict:
     }
 
 
-def _generate_report_openai(stats: WeeklyStats, logs: list[DailyLog]) -> dict:
-    from openai import OpenAI
-    client = OpenAI(api_key=settings.openai_api_key)
+def _generate_report_ai(stats: WeeklyStats, logs: list[DailyLog]) -> dict:
+    from app.ai_client import chat, parse_json
 
     memo_summary = "\n".join(
         f"- {l.date}: {l.memo}" for l in logs if l.memo
@@ -141,20 +137,15 @@ def _generate_report_openai(stats: WeeklyStats, logs: list[DailyLog]) -> dict:
 以下のJSONのみ返してください（コードブロック不要）:
 {{"good_things":"今週良かったこと(1〜2文、アリアらしく元気に)","progress":"今週進んだこと(1文、アリアらしく)","next_action":"来週やること1つだけ(1文、具体的に、アリアらしく)","advice":"励ましの一言(1文、アリアらしく元気よく、ご主人様と呼びかけて)"}}"""
 
-    response = client.chat.completions.create(
-        model=settings.openai_model,
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.7,
-    )
-    raw = response.choices[0].message.content or "{}"
-    raw = raw.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
-    return json.loads(raw)
+    raw = chat(prompt, temperature=0.7)
+    if raw is None:
+        raise RuntimeError("No AI configured")
+    return parse_json(raw)
 
 
 @router.get("/latest", response_model=WeeklyReport)
 def get_latest_weekly_report(db: Session = Depends(get_db)):
     today = date.today()
-    # 直近7日間
     week_end = today
     week_start = today - timedelta(days=6)
     return _get_report(week_start, week_end, db)
@@ -181,8 +172,8 @@ def _get_report(week_start: date, week_end: date, db: Session) -> WeeklyReport:
     stats = _calc_stats(logs, week_start, week_end)
 
     try:
-        if settings.openai_api_key and logs:
-            data = _generate_report_openai(stats, logs)
+        if logs:
+            data = _generate_report_ai(stats, logs)
         else:
             data = _generate_report_fallback(stats)
     except Exception:

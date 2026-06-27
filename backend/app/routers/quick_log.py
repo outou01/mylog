@@ -1,9 +1,6 @@
-import json
 from datetime import date
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-
-from app.config import settings
 
 router = APIRouter(prefix="/quick-log", tags=["quick-log"])
 
@@ -36,9 +33,8 @@ FALLBACK_DEFAULTS = {
 }
 
 
-def _parse_with_openai(text: str, today: str) -> dict:
-    from openai import OpenAI
-    client = OpenAI(api_key=settings.openai_api_key)
+def _parse_with_ai(text: str, today: str) -> dict:
+    from app.ai_client import chat, parse_json
 
     prompt = f"""以下の日本語テキストから生活ログ情報を抽出し、JSONのみを返してください。
 
@@ -59,35 +55,27 @@ def _parse_with_openai(text: str, today: str) -> dict:
 JSONのみ返してください（コードブロック不要）:
 {{"date":"...","sleep_hours":0.0,"overtime_hours":0.0,"mood_score":3,"did_workout":false,"did_create":false,"did_code":false,"drank_alcohol":false,"memo":"..."}}"""
 
-    response = client.chat.completions.create(
-        model=settings.openai_model,
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.2,
-    )
-    raw = response.choices[0].message.content or "{}"
-    raw = raw.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
-    return json.loads(raw)
+    raw = chat(prompt, temperature=0.2)
+    if raw is None:
+        raise RuntimeError("No AI configured")
+    return parse_json(raw)
 
 
 def _parse_fallback(text: str, today: str) -> dict:
-    """Simple rule-based parser used when OpenAI is not configured."""
     import re
 
     result = {**FALLBACK_DEFAULTS, "date": today}
 
-    # sleep
     m = re.search(r"(\d+(?:\.\d+)?)\s*時間.*?寝|睡眠\s*(\d+(?:\.\d+)?)", text)
     if m:
         result["sleep_hours"] = float(m.group(1) or m.group(2))
 
-    # overtime
     m = re.search(r"残業\s*(\d+(?:\.\d+)?)\s*時間", text)
     if m:
         result["overtime_hours"] = float(m.group(1))
     if re.search(r"残業\s*なし|定時", text):
         result["overtime_hours"] = 0.0
 
-    # activities
     if re.search(r"筋トレ|トレーニング|ジム", text):
         result["did_workout"] = True
     if re.search(r"創作|小説|絵|イラスト|音楽|デザイン", text):
@@ -97,7 +85,6 @@ def _parse_fallback(text: str, today: str) -> dict:
     if re.search(r"飲酒|お酒|ビール|飲んだ|晩酌", text):
         result["drank_alcohol"] = True
 
-    # mood
     if re.search(r"限界|最悪|しんどい|きつい|つらい", text):
         result["mood_score"] = 1
     elif re.search(r"疲れ|疲労|メンタル重|だるい|憂鬱", text):
@@ -107,14 +94,12 @@ def _parse_fallback(text: str, today: str) -> dict:
     elif re.search(r"良かった|元気|そこそこ|まずまず", text):
         result["mood_score"] = 4
 
-    # memo: use original text truncated
     result["memo"] = text[:100].strip()
 
     return result
 
 
 def _sanitize(data: dict, today: str) -> dict:
-    """Ensure all required fields exist with valid values."""
     result = {**FALLBACK_DEFAULTS, "date": today, **data}
     result["sleep_hours"] = max(0.0, min(24.0, float(result.get("sleep_hours", 7.0))))
     result["overtime_hours"] = max(0.0, float(result.get("overtime_hours", 0.0)))
@@ -137,10 +122,7 @@ def parse_quick_log(payload: QuickLogRequest):
     today = date.today().isoformat()
 
     try:
-        if settings.openai_api_key:
-            raw = _parse_with_openai(payload.text, today)
-        else:
-            raw = _parse_fallback(payload.text, today)
+        raw = _parse_with_ai(payload.text, today)
     except Exception:
         raw = _parse_fallback(payload.text, today)
 

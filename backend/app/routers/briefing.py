@@ -1,18 +1,14 @@
-import json
 from datetime import date, timedelta
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.config import settings
 from app.database import get_db
 from app.models import DailyLog, MonthlyTheme, WeekendNote
 from app.routers.weekly_report import _calc_stats
 
 router = APIRouter(prefix="/briefing", tags=["briefing"])
 
-
-# ── schemas ──────────────────────────────────────────────
 
 class MonthlyThemeUpsert(BaseModel):
     theme_text: str
@@ -44,8 +40,6 @@ class BriefingOut(BaseModel):
     suggested_action: str
 
 
-# ── monthly theme ─────────────────────────────────────────
-
 @router.get("/theme", response_model=MonthlyThemeOut | None)
 def get_theme(db: Session = Depends(get_db)):
     month = date.today().strftime("%Y-%m")
@@ -67,8 +61,6 @@ def upsert_theme(payload: MonthlyThemeUpsert, db: Session = Depends(get_db)):
     return row
 
 
-# ── weekend note (来週やること保存) ───────────────────────
-
 @router.post("/note", response_model=dict)
 def save_weekend_note(payload: WeekendNoteUpsert, db: Session = Depends(get_db)):
     today = date.today()
@@ -81,18 +73,6 @@ def save_weekend_note(payload: WeekendNoteUpsert, db: Session = Depends(get_db))
         db.add(row)
     db.commit()
     return {"saved": True, "next_action": payload.next_action}
-
-
-# ── briefing ─────────────────────────────────────────────
-
-def _ai_advice(stats, theme_text: str | None, last_action: str | None, logs: list) -> tuple[str, str]:
-    """Returns (ai_advice, suggested_action)"""
-    if not settings.openai_api_key:
-        return _fallback_advice(stats, last_action)
-    try:
-        return _openai_advice(stats, theme_text, last_action, logs)
-    except Exception:
-        return _fallback_advice(stats, last_action)
 
 
 def _fallback_advice(stats, last_action: str | None) -> tuple[str, str]:
@@ -116,9 +96,8 @@ def _fallback_advice(stats, last_action: str | None) -> tuple[str, str]:
     return " ".join(parts), suggested
 
 
-def _openai_advice(stats, theme_text: str | None, last_action: str | None, logs: list) -> tuple[str, str]:
-    from openai import OpenAI
-    client = OpenAI(api_key=settings.openai_api_key)
+def _ai_advice(stats, theme_text: str | None, last_action: str | None, logs: list) -> tuple[str, str]:
+    from app.ai_client import chat, parse_json
 
     memo_summary = "\n".join(f"- {l.date}: {l.memo}" for l in logs if l.memo) or "なし"
 
@@ -146,14 +125,10 @@ def _openai_advice(stats, theme_text: str | None, last_action: str | None, logs:
 以下のJSONのみ返してください（コードブロック不要）:
 {{"ai_advice":"今週を踏まえた一言コメント(2文以内、アリアらしく元気に、ご主人様と呼びかけて)","suggested_action":"今週末やること1つだけ(動詞で始まる短い文)"}}"""
 
-    res = client.chat.completions.create(
-        model=settings.openai_model,
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.7,
-    )
-    raw = res.choices[0].message.content or "{}"
-    raw = raw.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
-    data = json.loads(raw)
+    raw = chat(prompt, temperature=0.7)
+    if raw is None:
+        return _fallback_advice(stats, last_action)
+    data = parse_json(raw)
     return data.get("ai_advice", ""), data.get("suggested_action", "")
 
 
@@ -178,12 +153,14 @@ def get_weekend_briefing(db: Session = Depends(get_db)):
     theme_row = db.query(MonthlyTheme).filter(MonthlyTheme.month == month).first()
     theme_text = theme_row.theme_text if theme_row else None
 
-    # 先週のnext_action
     last_week_start = week_start - timedelta(days=7)
     note_row = db.query(WeekendNote).filter(WeekendNote.week_start == last_week_start).first()
     last_next_action = note_row.next_action if note_row else None
 
-    ai_advice, suggested_action = _ai_advice(stats, theme_text, last_next_action, logs)
+    try:
+        ai_advice, suggested_action = _ai_advice(stats, theme_text, last_next_action, logs)
+    except Exception:
+        ai_advice, suggested_action = _fallback_advice(stats, last_next_action)
 
     return BriefingOut(
         today=today.isoformat(),

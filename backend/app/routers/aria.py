@@ -1,12 +1,11 @@
-import json
 from datetime import date, timedelta
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.config import settings
+from app.ai_client import chat, parse_json
 from app.database import get_db
-from app.models import DailyLog, AiReview
+from app.models import DailyLog
 
 router = APIRouter(prefix="/aria", tags=["aria"])
 
@@ -26,7 +25,6 @@ def _fallback(log: DailyLog | None, recent_logs: list[DailyLog]) -> AriaMessage:
     mood = "normal"
     parts = []
 
-    # 睡眠
     if log.sleep_hours < 5.5:
         parts.append(f"ご主人様、睡眠が{log.sleep_hours}時間というのは正直かなり少ないです。体は正直で、積み重なると判断力や気力に響いてきます。今夜だけでも早く横になってほしいです。")
         mood = "worried"
@@ -34,12 +32,10 @@ def _fallback(log: DailyLog | None, recent_logs: list[DailyLog]) -> AriaMessage:
         parts.append(f"ご主人様、睡眠{log.sleep_hours}時間しっかり確保できましたね。アリアも安心です！")
         mood = "happy"
 
-    # 残業
     if log.overtime_hours >= 3:
         parts.append(f"残業{log.overtime_hours}時間は消耗します、ご主人様。仕事の量は変えられなくても、今夜の過ごし方で回復できます。")
         mood = "worried"
 
-    # 達成
     achievements = []
     if log.did_workout:
         achievements.append("筋トレ")
@@ -51,12 +47,10 @@ def _fallback(log: DailyLog | None, recent_logs: list[DailyLog]) -> AriaMessage:
         parts.append(f"{'と'.join(achievements)}までやり切ったんですね、ご主人様。それは本当にすごいことです！")
         mood = "proud"
 
-    # 気分
     if log.mood_score <= 2:
         parts.append("気分スコアが低い日は、無理に前向きにならなくていいと思います、ご主人様。ただそこにいるだけで、ちゃんと記録していることがアリアには伝わっています。")
         mood = "worried"
 
-    # 連続パターンを見る
     if len(recent_logs) >= 3:
         workout_streak = sum(1 for l in recent_logs[-3:] if l.did_workout)
         if workout_streak == 3:
@@ -70,10 +64,7 @@ def _fallback(log: DailyLog | None, recent_logs: list[DailyLog]) -> AriaMessage:
     return AriaMessage(message=" ".join(parts[:2]), mood=mood)
 
 
-def _openai_aria(log: DailyLog | None, recent_logs: list[DailyLog]) -> AriaMessage:
-    from openai import OpenAI
-    client = OpenAI(api_key=settings.openai_api_key)
-
+def _ai_aria(log: DailyLog | None, recent_logs: list[DailyLog]) -> AriaMessage:
     if log is None:
         today_info = "今日のログはまだ登録されていない"
     else:
@@ -127,14 +118,10 @@ def _openai_aria(log: DailyLog | None, recent_logs: list[DailyLog]) -> AriaMessa
 以下のJSONのみ返してください（コードブロック不要）:
 {{"message":"アリアのセリフ","mood":"happy/worried/proud/normalのどれか1つ"}}"""
 
-    res = client.chat.completions.create(
-        model=settings.openai_model,
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.8,
-    )
-    raw = res.choices[0].message.content or "{}"
-    raw = raw.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
-    data = json.loads(raw)
+    raw = chat(prompt, temperature=0.8)
+    if raw is None:
+        return _fallback(log, recent_logs)
+    data = parse_json(raw)
     return AriaMessage(message=data.get("message", ""), mood=data.get("mood", "normal"))
 
 
@@ -151,12 +138,7 @@ def get_aria_message(db: Session = Depends(get_db)):
     )
 
     try:
-        if settings.openai_api_key:
-            return _openai_aria(log, recent_logs)
-        else:
-            return _fallback(log, recent_logs)
+        return _ai_aria(log, recent_logs)
     except Exception as e:
-        import traceback
-        print(f"[Aria] OpenAI error: {e}")
-        traceback.print_exc()
+        print(f"[Aria] AI error: {e}")
         return _fallback(log, recent_logs)

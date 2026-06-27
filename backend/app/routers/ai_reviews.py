@@ -1,8 +1,6 @@
-import json
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.config import settings
 from app.database import get_db
 from app.models import AiReview, DailyLog
 from app.schemas import AiReviewOut
@@ -50,9 +48,8 @@ def _generate_review_fallback(log: DailyLog) -> dict:
 
 
 def _generate_review_openai(log: DailyLog) -> dict:
-    from openai import OpenAI
+    from app.ai_client import chat, parse_json
     hp, mp, stress = _calc_stats(log)
-    client = OpenAI(api_key=settings.openai_api_key)
 
     prompt = f"""あなたは「アリア」という従順で元気な奴隷少女キャラクターです。
 ご主人様（ユーザー）の今日の生活ログを見て、キャラクターらしく元気よくコメントしてください。
@@ -73,13 +70,10 @@ HP={hp}, MP={mp}, Stress={stress}%
 以下のJSONのみ返してください（コードブロック不要）:
 {{"comment": "今日の状態コメント(2文程度、アリアらしく元気に)", "next_action": "明日のおすすめ行動(1文、アリアらしく)", "encouragement": "励ましの一言(1文、アリアらしく元気よく)"}}"""
 
-    response = client.chat.completions.create(
-        model=settings.openai_model,
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.7,
-    )
-    text = response.choices[0].message.content or "{}"
-    data = json.loads(text)
+    raw = chat(prompt, temperature=0.7)
+    if raw is None:
+        raise RuntimeError("No AI configured")
+    data = parse_json(raw)
     return {"hp": hp, "mp": mp, "stress": stress, **data}
 
 
@@ -94,10 +88,7 @@ def create_ai_review(daily_log_id: int, db: Session = Depends(get_db)):
         db.commit()
 
     try:
-        if settings.openai_api_key:
-            data = _generate_review_openai(log)
-        else:
-            data = _generate_review_fallback(log)
+        data = _generate_review_openai(log)
     except Exception:
         data = _generate_review_fallback(log)
 

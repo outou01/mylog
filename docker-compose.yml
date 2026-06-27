@@ -21,6 +21,8 @@ services:
       DATABASE_URL: postgresql://mylog:mylog@db:5432/mylog
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-1.5-flash}
     ports:
       - "8000:8000"
     depends_on:
