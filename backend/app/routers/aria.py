@@ -11,7 +11,7 @@ from app.models import DailyLog
 router = APIRouter(prefix="/aria", tags=["aria"])
 
 _cache: dict = {}  # key -> (result, timestamp)
-_CACHE_TTL = 60  # seconds
+_CACHE_TTL = 300  # seconds (5分)
 
 
 class VictoryCondition(BaseModel):
@@ -185,12 +185,21 @@ def _fallback_victory_condition(recent_logs: list) -> str:
 @router.get("/victory-condition", response_model=VictoryCondition)
 def get_victory_condition(db: Session = Depends(get_db)):
     today = date.today()
+    cache_key = f"victory-{today.isoformat()}"
+    now = time.time()
+
+    if cache_key in _cache:
+        result, ts = _cache[cache_key]
+        if now - ts < _CACHE_TTL:
+            return result
 
     from app.models import DailyLog as DL
     log = db.query(DL).filter(DL.date == today).first()
 
     if log and log.victory_condition:
-        return VictoryCondition(condition=log.victory_condition)
+        result = VictoryCondition(condition=log.victory_condition)
+        _cache[cache_key] = (result, now)
+        return result
 
     recent_logs = (
         db.query(DL)
@@ -208,7 +217,9 @@ def get_victory_condition(db: Session = Depends(get_db)):
         log.victory_condition = condition
         db.commit()
 
-    return VictoryCondition(condition=condition)
+    result = VictoryCondition(condition=condition)
+    _cache[cache_key] = (result, now)
+    return result
 
 
 @router.get("/message", response_model=AriaMessage)
