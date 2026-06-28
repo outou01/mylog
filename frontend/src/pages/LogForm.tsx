@@ -1,22 +1,58 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { createLog, updateLog, fetchLog, DailyLogCreate } from "../api/client";
+import { createLog, updateLog, fetchLog, DailyLog } from "../api/client";
 import QuickLog from "../components/QuickLog";
 import "./LogForm.css";
 
-const today = () => new Date().toISOString().slice(0, 10);
+const todayStr = () => new Date().toISOString().slice(0, 10);
 
-const EMPTY_FORM: DailyLogCreate = {
-  date: today(),
+const EMPTY_FORM = {
+  date: todayStr(),
   sleep_hours: 7,
   overtime_hours: 0,
   mood_score: 3,
   did_workout: false,
   did_create: false,
   did_code: false,
+  did_job_search: false,
+  did_study: false,
   drank_alcohol: false,
+  energy_level: 2,
+  day_type: "advance",
+  went_outside: false,
+  ate_good_food: false,
+  took_walk: false,
+  visited_cafe: false,
+  visited_akihabara: false,
+  napped: false,
+  played_games: false,
+  talked_with_friends: false,
+  did_nothing: false,
+  discharge_activities: "",
   memo: "",
 };
+
+type FormState = typeof EMPTY_FORM;
+
+const PROGRESS_ITEMS: [keyof FormState, string][] = [
+  ["did_workout", "💪 筋トレ"],
+  ["did_create", "🎨 創作"],
+  ["did_code", "💻 開発"],
+  ["did_job_search", "💼 転職活動"],
+  ["did_study", "📚 勉強"],
+];
+
+const RECOVERY_ITEMS: [keyof FormState, string][] = [
+  ["went_outside", "🌞 外出した"],
+  ["ate_good_food", "🍜 美味しいもの食べた"],
+  ["took_walk", "🚶 散歩した"],
+  ["visited_cafe", "☕ カフェ行った"],
+  ["visited_akihabara", "🏙 秋葉原行った"],
+  ["napped", "😴 昼寝した"],
+  ["played_games", "🎮 ゲームした"],
+  ["talked_with_friends", "💬 友人と話した"],
+  ["did_nothing", "☁ 何もしなかった"],
+];
 
 export default function LogForm() {
   const navigate = useNavigate();
@@ -26,12 +62,12 @@ export default function LogForm() {
   const [submitting, setSubmitting] = useState(false);
   const [loadingEdit, setLoadingEdit] = useState(!!editId);
   const [error, setError] = useState("");
-  const [form, setForm] = useState<DailyLogCreate>(EMPTY_FORM);
+  const [form, setForm] = useState<FormState>(EMPTY_FORM);
 
   useEffect(() => {
     if (!editId) return;
     fetchLog(editId)
-      .then((log) => {
+      .then((log: DailyLog) => {
         setForm({
           date: log.date,
           sleep_hours: log.sleep_hours,
@@ -40,7 +76,21 @@ export default function LogForm() {
           did_workout: log.did_workout,
           did_create: log.did_create,
           did_code: log.did_code,
+          did_job_search: log.did_job_search ?? false,
+          did_study: log.did_study ?? false,
           drank_alcohol: log.drank_alcohol,
+          energy_level: log.energy_level ?? 2,
+          day_type: log.day_type ?? "advance",
+          went_outside: log.went_outside ?? false,
+          ate_good_food: log.ate_good_food ?? false,
+          took_walk: log.took_walk ?? false,
+          visited_cafe: log.visited_cafe ?? false,
+          visited_akihabara: log.visited_akihabara ?? false,
+          napped: log.napped ?? false,
+          played_games: log.played_games ?? false,
+          talked_with_friends: log.talked_with_friends ?? false,
+          did_nothing: log.did_nothing ?? false,
+          discharge_activities: log.discharge_activities ?? "",
           memo: log.memo ?? "",
         });
       })
@@ -48,7 +98,7 @@ export default function LogForm() {
       .finally(() => setLoadingEdit(false));
   }, [editId]);
 
-  const set = (key: keyof DailyLogCreate, value: unknown) =>
+  const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -81,10 +131,7 @@ export default function LogForm() {
           <div className="card" style={{ marginBottom: "1.5rem" }}>
             <QuickLog onRegistered={() => navigate("/")} />
           </div>
-
-          <div className="form-divider">
-            <span>または手動で入力</span>
-          </div>
+          <div className="form-divider"><span>または手動で入力</span></div>
         </>
       )}
 
@@ -120,21 +167,72 @@ export default function LogForm() {
           </div>
         </div>
 
+        <div className="form-row">
+          <label>エネルギー</label>
+          <div className="mood-selector">
+            {([1, 2, 3] as const).map((n) => (
+              <button key={n} type="button"
+                className={`mood-btn ${form.energy_level === n ? "active" : ""}`}
+                onClick={() => set("energy_level", n)}
+              >
+                {["😩 疲れた", "😐 普通", "😊 元気"][n - 1]}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="form-row">
+          <label>今日の目的</label>
+          <div className="mood-selector">
+            {[
+              ["advance", "⚔ 前進"],
+              ["recovery", "🛌 回復"],
+              ["maintenance", "🔧 メンテ"],
+            ].map(([v, l]) => (
+              <button key={v} type="button"
+                className={`mood-btn ${form.day_type === v ? "active" : ""}`}
+                onClick={() => set("day_type", v)}
+              >
+                {l}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="form-row toggle-row">
-          {(
-            [
-              ["did_workout", "💪 筋トレした"],
-              ["did_create", "🎨 創作した"],
-              ["did_code", "💻 Web開発した"],
-              ["drank_alcohol", "🍺 お酒を飲んだ"],
-            ] as [keyof DailyLogCreate, string][]
-          ).map(([key, label]) => (
+          <label style={{ width: "100%", color: "var(--accent)", fontSize: "0.8rem", marginBottom: "0.5rem" }}>⚔ 前進ポイント</label>
+          {PROGRESS_ITEMS.map(([key, label]) => (
             <label key={key} className={`toggle ${form[key] ? "on" : ""}`}>
               <input type="checkbox" checked={!!form[key]}
-                onChange={(e) => set(key, e.target.checked)} />
+                onChange={(e) => set(key, e.target.checked as FormState[typeof key])} />
               {label}
             </label>
           ))}
+        </div>
+
+        <div className="form-row toggle-row">
+          <label style={{ width: "100%", color: "var(--green)", fontSize: "0.8rem", marginBottom: "0.5rem" }}>🛌 回復ポイント</label>
+          {RECOVERY_ITEMS.map(([key, label]) => (
+            <label key={key} className={`toggle ${form[key] ? "on" : ""}`}>
+              <input type="checkbox" checked={!!form[key]}
+                onChange={(e) => set(key, e.target.checked as FormState[typeof key])} />
+              {label}
+            </label>
+          ))}
+        </div>
+
+        <div className="form-row toggle-row">
+          <label className={`toggle ${form.drank_alcohol ? "on" : ""}`}>
+            <input type="checkbox" checked={form.drank_alcohol}
+              onChange={(e) => set("drank_alcohol", e.target.checked)} />
+            🍺 お酒を飲んだ
+          </label>
+        </div>
+
+        <div className="form-row">
+          <label>発散（なんでも記録）</label>
+          <textarea rows={2} value={form.discharge_activities} placeholder="ゲーム、YouTube、パチンコ..."
+            onChange={(e) => set("discharge_activities", e.target.value)} />
         </div>
 
         <div className="form-row">

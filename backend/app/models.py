@@ -18,6 +18,29 @@ class DailyLog(Base):
     did_code: Mapped[bool] = mapped_column(Boolean, default=False)
     drank_alcohol: Mapped[bool] = mapped_column(Boolean, default=False)
     memo: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # エネルギー管理フィールド
+    energy_level: Mapped[int] = mapped_column(Integer, default=2)  # 1=疲れた 2=普通 3=元気
+    day_type: Mapped[str] = mapped_column(String(20), default="advance")  # advance/recovery/maintenance
+    did_job_search: Mapped[bool] = mapped_column(Boolean, default=False)
+    did_study: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    # 回復ポイント
+    went_outside: Mapped[bool] = mapped_column(Boolean, default=False)
+    ate_good_food: Mapped[bool] = mapped_column(Boolean, default=False)
+    took_walk: Mapped[bool] = mapped_column(Boolean, default=False)
+    visited_cafe: Mapped[bool] = mapped_column(Boolean, default=False)
+    visited_akihabara: Mapped[bool] = mapped_column(Boolean, default=False)
+    napped: Mapped[bool] = mapped_column(Boolean, default=False)
+    played_games: Mapped[bool] = mapped_column(Boolean, default=False)
+    talked_with_friends: Mapped[bool] = mapped_column(Boolean, default=False)
+    did_nothing: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    # 発散・勝利条件
+    discharge_activities: Mapped[str | None] = mapped_column(Text, nullable=True)
+    victory_condition: Mapped[str | None] = mapped_column(Text, nullable=True)
+    victory_achieved: Mapped[bool] = mapped_column(Boolean, default=False)
+
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 

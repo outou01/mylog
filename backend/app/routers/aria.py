@@ -14,6 +14,10 @@ _cache: dict = {}  # key -> (result, timestamp)
 _CACHE_TTL = 60  # seconds
 
 
+class VictoryCondition(BaseModel):
+    condition: str
+
+
 class AriaMessage(BaseModel):
     message: str
     mood: str  # happy / worried / proud / normal
@@ -127,6 +131,84 @@ def _ai_aria(log: DailyLog | None, recent_logs: list[DailyLog]) -> AriaMessage:
         return _fallback(log, recent_logs)
     data = parse_json(raw)
     return AriaMessage(message=data.get("message", ""), mood=data.get("mood", "normal"))
+
+
+def _generate_victory_condition(recent_logs: list) -> str:
+    from app.ai_client import chat, parse_json
+
+    recent_summary = ""
+    if recent_logs:
+        lines = []
+        for l in recent_logs[-5:]:
+            flags = []
+            if l.did_workout: flags.append("筋トレ")
+            if l.did_create: flags.append("創作")
+            if l.did_code: flags.append("開発")
+            lines.append(f"- {l.date}: 睡眠{l.sleep_hours}h 気分{l.mood_score}/5 {' '.join(flags)}")
+        recent_summary = "\n".join(lines)
+
+    prompt = f"""あなたは「アリア」です。ご主人様の今日の勝利条件を1つだけ決めてください。
+
+【直近のログ】
+{recent_summary or 'まだログなし'}
+
+【ルール】
+- 達成できそうな小さな目標を1つだけ
+- 例: 「筋トレして、創作を10分やる」「外出して、何か美味しいものを食べる」「睡眠を7時間取る」
+- 2つまでの行動を組み合わせてもOK（でも欲張らない）
+- 疲れてそうなら超シンプルに
+- 日本語で短く（20文字以内）
+
+JSONのみ返してください:
+{{"condition":"今日の勝利条件"}}"""
+
+    raw = chat(prompt, temperature=0.8)
+    if raw is None:
+        raise RuntimeError("No AI")
+    data = parse_json(raw)
+    return data.get("condition", "")
+
+
+def _fallback_victory_condition(recent_logs: list) -> str:
+    if not recent_logs:
+        return "今日のログを記録する"
+    last = recent_logs[-1]
+    if last.sleep_hours < 6:
+        return "早めに寝て、睡眠7時間を取る"
+    if not last.did_workout:
+        return "筋トレして、創作を10分やる"
+    if not last.did_create:
+        return "創作を30分やる"
+    return "外出して、気分転換する"
+
+
+@router.get("/victory-condition", response_model=VictoryCondition)
+def get_victory_condition(db: Session = Depends(get_db)):
+    today = date.today()
+
+    from app.models import DailyLog as DL
+    log = db.query(DL).filter(DL.date == today).first()
+
+    if log and log.victory_condition:
+        return VictoryCondition(condition=log.victory_condition)
+
+    recent_logs = (
+        db.query(DL)
+        .filter(DL.date >= today - timedelta(days=7), DL.date <= today)
+        .order_by(DL.date.asc())
+        .all()
+    )
+
+    try:
+        condition = _generate_victory_condition(recent_logs)
+    except Exception:
+        condition = _fallback_victory_condition(recent_logs)
+
+    if log:
+        log.victory_condition = condition
+        db.commit()
+
+    return VictoryCondition(condition=condition)
 
 
 @router.get("/message", response_model=AriaMessage)

@@ -25,10 +25,28 @@ export interface DailyLog {
   did_code: boolean;
   drank_alcohol: boolean;
   memo: string | null;
+  energy_level: number;
+  day_type: string;
+  did_job_search: boolean;
+  did_study: boolean;
+  went_outside: boolean;
+  ate_good_food: boolean;
+  took_walk: boolean;
+  visited_cafe: boolean;
+  visited_akihabara: boolean;
+  napped: boolean;
+  played_games: boolean;
+  talked_with_friends: boolean;
+  did_nothing: boolean;
+  discharge_activities: string | null;
+  victory_condition: string | null;
+  victory_achieved: boolean;
   created_at: string;
   updated_at: string;
   ai_review: AiReview | null;
 }
+
+export type DailyLogUpdate = Partial<Omit<DailyLog, "id" | "date" | "created_at" | "updated_at" | "ai_review">>;
 
 export interface DailyLogCreate {
   date: string;
@@ -40,6 +58,22 @@ export interface DailyLogCreate {
   did_code: boolean;
   drank_alcohol: boolean;
   memo: string;
+  energy_level: number;
+  day_type: string;
+  did_job_search: boolean;
+  did_study: boolean;
+  went_outside: boolean;
+  ate_good_food: boolean;
+  took_walk: boolean;
+  visited_cafe: boolean;
+  visited_akihabara: boolean;
+  napped: boolean;
+  played_games: boolean;
+  talked_with_friends: boolean;
+  did_nothing: boolean;
+  discharge_activities: string;
+  victory_condition: string;
+  victory_achieved: boolean;
 }
 
 export interface QuickLogParsed {
@@ -57,8 +91,10 @@ export interface QuickLogParsed {
 export const fetchLogs = () => api.get<DailyLog[]>("/daily-logs").then((r) => r.data);
 export const fetchLatestLog = () => api.get<DailyLog>("/daily-logs/latest").then((r) => r.data);
 export const fetchLog = (id: number) => api.get<DailyLog>(`/daily-logs/${id}`).then((r) => r.data);
-export const createLog = (data: DailyLogCreate) => api.post<DailyLog>("/daily-logs", data).then((r) => r.data);
-export const updateLog = (id: number, data: Partial<DailyLogCreate>) => api.patch<DailyLog>(`/daily-logs/${id}`, data).then((r) => r.data);
+export const createLog = (data: Partial<DailyLogCreate> & { date: string; sleep_hours: number; mood_score: number }) =>
+  api.post<DailyLog>("/daily-logs", data).then((r) => r.data);
+export const updateLog = (id: number, data: DailyLogUpdate) =>
+  api.patch<DailyLog>(`/daily-logs/${id}`, data).then((r) => r.data);
 export const generateReview = (id: number) => api.post<AiReview>(`/ai-review/${id}`).then((r) => r.data);
 export const parseQuickLog = (text: string) =>
   api.post<QuickLogParsed>("/quick-log/parse", { text }).then((r) => r.data);
@@ -119,3 +155,6 @@ export interface AriaMessage {
 
 export const fetchAriaMessage = () =>
   api.get<AriaMessage>("/aria/message").then((r) => r.data);
+
+export const fetchVictoryCondition = () =>
+  api.get<{ condition: string }>("/aria/victory-condition").then((r) => r.data);

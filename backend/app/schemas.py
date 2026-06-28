@@ -12,6 +12,22 @@ class DailyLogCreate(BaseModel):
     did_code: bool = False
     drank_alcohol: bool = False
     memo: str | None = None
+    energy_level: int = Field(ge=1, le=3, default=2)
+    day_type: str = "advance"
+    did_job_search: bool = False
+    did_study: bool = False
+    went_outside: bool = False
+    ate_good_food: bool = False
+    took_walk: bool = False
+    visited_cafe: bool = False
+    visited_akihabara: bool = False
+    napped: bool = False
+    played_games: bool = False
+    talked_with_friends: bool = False
+    did_nothing: bool = False
+    discharge_activities: str | None = None
+    victory_condition: str | None = None
+    victory_achieved: bool = False
 
 
 class DailyLogUpdate(BaseModel):
@@ -23,6 +39,22 @@ class DailyLogUpdate(BaseModel):
     did_code: bool | None = None
     drank_alcohol: bool | None = None
     memo: str | None = None
+    energy_level: int | None = Field(None, ge=1, le=3)
+    day_type: str | None = None
+    did_job_search: bool | None = None
+    did_study: bool | None = None
+    went_outside: bool | None = None
+    ate_good_food: bool | None = None
+    took_walk: bool | None = None
+    visited_cafe: bool | None = None
+    visited_akihabara: bool | None = None
+    napped: bool | None = None
+    played_games: bool | None = None
+    talked_with_friends: bool | None = None
+    did_nothing: bool | None = None
+    discharge_activities: str | None = None
+    victory_condition: str | None = None
+    victory_achieved: bool | None = None
 
 
 class AiReviewOut(BaseModel):
@@ -50,6 +82,22 @@ class DailyLogOut(BaseModel):
     did_code: bool
     drank_alcohol: bool
     memo: str | None
+    energy_level: int
+    day_type: str
+    did_job_search: bool
+    did_study: bool
+    went_outside: bool
+    ate_good_food: bool
+    took_walk: bool
+    visited_cafe: bool
+    visited_akihabara: bool
+    napped: bool
+    played_games: bool
+    talked_with_friends: bool
+    did_nothing: bool
+    discharge_activities: str | None
+    victory_condition: str | None
+    victory_achieved: bool
     created_at: datetime
     updated_at: datetime
     ai_review: AiReviewOut | None = None
