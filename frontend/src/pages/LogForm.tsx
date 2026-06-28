@@ -4,7 +4,10 @@ import { createLog, updateLog, fetchLog, DailyLog } from "../api/client";
 import QuickLog from "../components/QuickLog";
 import "./LogForm.css";
 
-const todayStr = () => new Date().toISOString().slice(0, 10);
+const todayStr = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
 
 const EMPTY_FORM = {
   date: todayStr(),

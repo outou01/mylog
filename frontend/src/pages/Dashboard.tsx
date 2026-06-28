@@ -6,7 +6,10 @@ import {
 import Aria from "../components/Aria";
 import "./Dashboard.css";
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
 
 const ENERGY_LABELS: Record<number, string> = { 1: "😩 疲れた", 2: "😐 普通", 3: "😊 元気" };
 const DAY_TYPES = [
