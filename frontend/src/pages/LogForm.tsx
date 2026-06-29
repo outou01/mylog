@@ -100,6 +100,11 @@ export default function LogForm() {
           did_nothing: log.did_nothing ?? false,
           discharge_activities: log.discharge_activities ?? "",
           memo: log.memo ?? "",
+          create_hours: log.create_hours ?? 0,
+          workout_hours: log.workout_hours ?? 0,
+          study_hours: log.study_hours ?? 0,
+          code_hours: log.code_hours ?? 0,
+          job_search_hours: log.job_search_hours ?? 0,
         });
       })
       .catch(() => setError("ログの読み込みに失敗しました"))
@@ -219,10 +224,10 @@ export default function LogForm() {
             <div key={key} style={{ display: "flex", alignItems: "center", gap: "0.75rem", padding: "0.4rem 0" }}>
               <span style={{ width: "110px", fontSize: "0.88rem" }}>{label}</span>
               <input type="range" min={0} max={4} step={0.5}
-                value={(form as Record<string, number>)[key] ?? 0}
+                value={(form as unknown as Record<string, number>)[key] ?? 0}
                 onChange={(e) => set(key as keyof FormState, parseFloat(e.target.value) as FormState[keyof FormState])}
                 style={{ flex: 1 }} />
-              <span className="val" style={{ width: "30px" }}>{(form as Record<string, number>)[key] ?? 0}h</span>
+              <span className="val" style={{ width: "30px" }}>{(form as unknown as Record<string, number>)[key] ?? 0}h</span>
             </div>
           ))}
         </div>
