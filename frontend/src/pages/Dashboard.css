@@ -196,6 +196,112 @@
   margin-left: 0.25rem;
 }
 
+/* 前進クエスト（時間入力） */
+.quest-card {}
+.total-hours-badge {
+  display: inline-block;
+  margin-left: 0.5rem;
+  background: var(--accent);
+  color: var(--bg);
+  font-size: 0.75rem;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-weight: 700;
+}
+.quest-list { display: flex; flex-direction: column; gap: 0.6rem; }
+.quest-item {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.6rem 0.8rem;
+  transition: border-color 0.15s;
+}
+.quest-item.active { border-color: var(--accent); background: rgba(96,165,250,0.06); }
+.quest-item-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+}
+.quest-icon { font-size: 1rem; }
+.quest-label { flex: 1; font-size: 0.9rem; }
+.quest-hours {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.hour-selector {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.hour-btn {
+  padding: 3px 8px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.hour-btn:hover { background: var(--surface); border-color: var(--accent); }
+.hour-btn.active {
+  background: var(--accent);
+  color: var(--bg);
+  border-color: var(--accent);
+  font-weight: 700;
+}
+
+/* パチンコ分析 */
+.pachinko-card { border-color: var(--yellow); }
+.pachinko-section { margin-top: 0.75rem; }
+.pachinko-label { font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0.4rem; }
+.pachinko-reasons { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.pachinko-tag {
+  padding: 4px 10px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.pachinko-tag.active { background: var(--yellow); color: var(--bg); border-color: var(--yellow); font-weight: 600; }
+.feeling-selector { display: flex; gap: 0.5rem; }
+.feeling-btn {
+  flex: 1;
+  padding: 0.5rem;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.feeling-btn.active { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+.minutes-selector { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+.minutes-btn {
+  padding: 4px 10px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.minutes-btn.active { background: var(--green); color: var(--bg); border-color: var(--green); font-weight: 700; }
+
+/* サマリー */
+.summary-card { padding: 0.75rem 1rem; }
+.summary-row { display: flex; gap: 1.5rem; flex-wrap: wrap; }
+.summary-item { font-size: 0.88rem; color: var(--text-muted); }
+.summary-item strong { color: var(--text); margin-left: 0.25rem; }
+
 /* 発散 */
 .discharge-card {}
 .discharge-input {

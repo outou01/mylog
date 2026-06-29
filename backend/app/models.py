@@ -36,10 +36,22 @@ class DailyLog(Base):
     talked_with_friends: Mapped[bool] = mapped_column(Boolean, default=False)
     did_nothing: Mapped[bool] = mapped_column(Boolean, default=False)
 
+    # 活動時間（時間単位）
+    create_hours: Mapped[float] = mapped_column(Float, default=0.0)
+    workout_hours: Mapped[float] = mapped_column(Float, default=0.0)
+    study_hours: Mapped[float] = mapped_column(Float, default=0.0)
+    code_hours: Mapped[float] = mapped_column(Float, default=0.0)
+    job_search_hours: Mapped[float] = mapped_column(Float, default=0.0)
+
     # 発散・勝利条件
     discharge_activities: Mapped[str | None] = mapped_column(Text, nullable=True)
     victory_condition: Mapped[str | None] = mapped_column(Text, nullable=True)
     victory_achieved: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    # パチンコ分析
+    pachinko_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    pachinko_feeling_after: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    pachinko_creation_minutes_after: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())

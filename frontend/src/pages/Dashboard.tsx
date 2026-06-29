@@ -1,12 +1,10 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
-import {
-  DailyLog, fetchLatestLog, fetchVictoryCondition, updateLog, createLog,
-} from "../api/client";
+import { DailyLog, fetchLatestLog, fetchVictoryCondition, updateLog, createLog } from "../api/client";
 import Aria from "../components/Aria";
 import "./Dashboard.css";
 
-const today = () => {
+const localToday = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
@@ -18,25 +16,52 @@ const DAY_TYPES = [
   { value: "maintenance", label: "🔧 メンテの日" },
 ];
 
-const PROGRESS_ITEMS: [keyof DailyLog, string][] = [
-  ["did_workout", "💪 筋トレ"],
-  ["did_create", "🎨 創作"],
-  ["did_code", "💻 開発"],
-  ["did_job_search", "💼 転職活動"],
-  ["did_study", "📚 勉強"],
+type HourKey = "create_hours" | "workout_hours" | "study_hours" | "code_hours" | "job_search_hours";
+const PROGRESS_ITEMS: { key: HourKey; label: string; icon: string }[] = [
+  { key: "create_hours", label: "創作", icon: "🎨" },
+  { key: "workout_hours", label: "筋トレ", icon: "💪" },
+  { key: "code_hours", label: "開発", icon: "💻" },
+  { key: "study_hours", label: "勉強", icon: "📚" },
+  { key: "job_search_hours", label: "転職活動", icon: "💼" },
 ];
 
+const HOUR_OPTIONS = [0, 0.5, 1, 1.5, 2, 3, 4];
+
 const RECOVERY_ITEMS: [keyof DailyLog, string][] = [
-  ["went_outside", "🌞 外出した"],
-  ["ate_good_food", "🍜 美味しいもの食べた"],
-  ["took_walk", "🚶 散歩した"],
-  ["visited_cafe", "☕ カフェ行った"],
-  ["visited_akihabara", "🏙 秋葉原行った"],
-  ["napped", "😴 昼寝した"],
-  ["played_games", "🎮 ゲームした"],
-  ["talked_with_friends", "💬 友人と話した"],
-  ["did_nothing", "☁ 何もしなかった"],
+  ["went_outside", "🌞 外出"],
+  ["ate_good_food", "🍜 美食"],
+  ["took_walk", "🚶 散歩"],
+  ["visited_cafe", "☕ カフェ"],
+  ["visited_akihabara", "🏙 秋葉原"],
+  ["napped", "😴 昼寝"],
+  ["played_games", "🎮 ゲーム"],
+  ["talked_with_friends", "💬 友人と話す"],
+  ["did_nothing", "☁ 何もしない"],
 ];
+
+const PACHINKO_REASONS = ["ストレス", "暇", "秋葉原ついで", "動画を見て行きたくなった", "習慣", "その他"];
+const FEELING_OPTIONS = [
+  { value: "satisfied", label: "😊 スッキリ" },
+  { value: "neutral", label: "😐 普通" },
+  { value: "regret", label: "😞 後悔" },
+];
+const CREATION_MINUTES = [0, 10, 30, 60, 120];
+
+function HourSelector({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  return (
+    <div className="hour-selector">
+      {HOUR_OPTIONS.map((h) => (
+        <button
+          key={h}
+          className={`hour-btn ${value === h ? "active" : ""} ${value > 0 && h === value ? "selected" : ""}`}
+          onClick={() => onChange(h === value ? 0 : h)}
+        >
+          {h === 0 ? "—" : `${h}h`}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 export default function Dashboard() {
   const [log, setLog] = useState<DailyLog | null>(null);
@@ -45,8 +70,9 @@ export default function Dashboard() {
   const [isToday, setIsToday] = useState(false);
   const [creatingLog, setCreatingLog] = useState(false);
   const [discharge, setDischarge] = useState("");
+  const [showPachinko, setShowPachinko] = useState(false);
 
-  const todayStr = today();
+  const todayStr = localToday();
 
   const loadData = useCallback(async () => {
     try {
@@ -66,15 +92,29 @@ export default function Dashboard() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
+  useEffect(() => {
+    if (discharge.includes("パチンコ")) setShowPachinko(true);
+  }, [discharge]);
+
   const patch = async (fields: Partial<DailyLog>) => {
     if (!log) return;
     const updated = await updateLog(log.id, fields);
     setLog(updated);
   };
 
-  const toggle = (key: keyof DailyLog) => {
+  const toggleRecovery = (key: keyof DailyLog) => {
     if (!log || !isToday) return;
     patch({ [key]: !log[key] });
+  };
+
+  const setHours = (key: HourKey, val: number) => {
+    if (!log || !isToday) return;
+    const boolKey = key === "create_hours" ? "did_create"
+      : key === "workout_hours" ? "did_workout"
+      : key === "code_hours" ? "did_code"
+      : key === "study_hours" ? "did_study"
+      : "did_job_search";
+    patch({ [key]: val, [boolKey]: val > 0 });
   };
 
   const handleVictoryAchieved = async () => {
@@ -100,8 +140,10 @@ export default function Dashboard() {
     }
   };
 
+  const totalAdvanceHours = log
+    ? (log.create_hours || 0) + (log.workout_hours || 0) + (log.study_hours || 0) + (log.code_hours || 0) + (log.job_search_hours || 0)
+    : 0;
   const recoveryCount = log ? RECOVERY_ITEMS.filter(([k]) => log[k]).length : 0;
-  const progressCount = log ? PROGRESS_ITEMS.filter(([k]) => log[k]).length : 0;
 
   if (!log) {
     return (
@@ -145,9 +187,7 @@ export default function Dashboard() {
             <div className="victory-label">🎯 今日の勝利条件</div>
             <div className="victory-text">「{victory}」</div>
             {!log.victory_achieved ? (
-              <button className="btn btn-accent victory-btn" onClick={handleVictoryAchieved}>
-                ✅ 達成した！
-              </button>
+              <button className="btn btn-accent victory-btn" onClick={handleVictoryAchieved}>✅ 達成した！</button>
             ) : (
               <div className="victory-done">✨ クリア済み</div>
             )}
@@ -160,11 +200,8 @@ export default function Dashboard() {
             <div className="section-label">今日のエネルギー</div>
             <div className="energy-slider">
               {[1, 2, 3].map((v) => (
-                <button
-                  key={v}
-                  className={`energy-btn ${log.energy_level === v ? "active" : ""}`}
-                  onClick={() => patch({ energy_level: v })}
-                >
+                <button key={v} className={`energy-btn ${log.energy_level === v ? "active" : ""}`}
+                  onClick={() => patch({ energy_level: v })}>
                   {ENERGY_LABELS[v]}
                 </button>
               ))}
@@ -172,11 +209,8 @@ export default function Dashboard() {
             <div className="section-label" style={{ marginTop: "1rem" }}>今日の目的</div>
             <div className="day-type-selector">
               {DAY_TYPES.map(({ value, label }) => (
-                <button
-                  key={value}
-                  className={`day-type-btn ${log.day_type === value ? "active" : ""}`}
-                  onClick={() => patch({ day_type: value })}
-                >
+                <button key={value} className={`day-type-btn ${log.day_type === value ? "active" : ""}`}
+                  onClick={() => patch({ day_type: value })}>
                   {label}
                 </button>
               ))}
@@ -184,37 +218,39 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* 前進ポイント */}
-        <div className="card checklist-card">
-          <div className="section-label">⚔ 前進ポイント <span className="count-badge">{progressCount}/{PROGRESS_ITEMS.length}</span></div>
-          <div className="checklist">
-            {PROGRESS_ITEMS.map(([key, label]) => (
-              <label
-                key={key}
-                className={`check-item ${log[key] ? "checked" : ""} ${!isToday ? "readonly" : ""}`}
-                onClick={() => toggle(key)}
-              >
-                <span className="check-box">{log[key] ? "✅" : "⬜"}</span>
-                <span>{label}</span>
-              </label>
-            ))}
+        {/* 前進クエスト（時間入力） */}
+        <div className="card quest-card">
+          <div className="section-label">
+            ⚔ 前進クエスト
+            {totalAdvanceHours > 0 && <span className="total-hours-badge">合計 {totalAdvanceHours}h</span>}
           </div>
-          <div className="section-label" style={{ marginTop: "0.75rem" }}>
-            睡眠 <span className="val-badge">{log.sleep_hours}h</span>
-            {" "} 気分 <span className="val-badge">{["", "😞", "😕", "😐", "🙂", "😄"][log.mood_score]}</span>
+          <div className="quest-list">
+            {PROGRESS_ITEMS.map(({ key, label, icon }) => {
+              const val = (log[key] as number) || 0;
+              return (
+                <div key={key} className={`quest-item ${val > 0 ? "active" : ""}`}>
+                  <div className="quest-item-header">
+                    <span className="quest-icon">{icon}</span>
+                    <span className="quest-label">{label}</span>
+                    {val > 0 && <span className="quest-hours">{val}h</span>}
+                  </div>
+                  {isToday && <HourSelector value={val} onChange={(v) => setHours(key, v)} />}
+                </div>
+              );
+            })}
           </div>
         </div>
 
-        {/* 回復ポイント */}
+        {/* 回復クエスト */}
         <div className="card checklist-card recovery">
-          <div className="section-label">🛌 回復ポイント <span className="count-badge">{recoveryCount}/{RECOVERY_ITEMS.length}</span></div>
+          <div className="section-label">
+            🛌 回復クエスト <span className="count-badge">{recoveryCount}/{RECOVERY_ITEMS.length}</span>
+          </div>
           <div className="checklist">
             {RECOVERY_ITEMS.map(([key, label]) => (
-              <label
-                key={key}
+              <label key={key}
                 className={`check-item ${log[key] ? "checked" : ""} ${!isToday ? "readonly" : ""}`}
-                onClick={() => toggle(key)}
-              >
+                onClick={() => toggleRecovery(key)}>
                 <span className="check-box">{log[key] ? "✅" : "⬜"}</span>
                 <span>{label}</span>
               </label>
@@ -222,12 +258,11 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* 発散記録 */}
+        {/* 発散ログ */}
         {isToday && (
           <div className="card discharge-card">
-            <div className="section-label">💨 今日の発散（記録のみ・否定なし）</div>
-            <textarea
-              className="discharge-input"
+            <div className="section-label">💨 発散ログ（記録のみ・否定なし）</div>
+            <textarea className="discharge-input"
               placeholder="ゲーム、YouTube、パチンコ、映画... なんでもOK"
               value={discharge}
               onChange={(e) => setDischarge(e.target.value)}
@@ -237,10 +272,70 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* アクション */}
+        {/* パチンコ分析 */}
+        {isToday && showPachinko && (
+          <div className="card pachinko-card">
+            <div className="section-label">🎰 パチンコ分析（学習用）</div>
+            <div className="pachinko-section">
+              <div className="pachinko-label">今日行った理由</div>
+              <div className="pachinko-reasons">
+                {PACHINKO_REASONS.map((r) => {
+                  const selected = log.pachinko_reason?.includes(r);
+                  return (
+                    <button key={r}
+                      className={`pachinko-tag ${selected ? "active" : ""}`}
+                      onClick={() => {
+                        const current = log.pachinko_reason || "";
+                        const next = selected
+                          ? current.replace(r, "").replace(/、、/g, "、").replace(/^、|、$/g, "")
+                          : current ? `${current}、${r}` : r;
+                        patch({ pachinko_reason: next });
+                      }}>
+                      {r}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="pachinko-section">
+              <div className="pachinko-label">終了後の気分</div>
+              <div className="feeling-selector">
+                {FEELING_OPTIONS.map(({ value, label }) => (
+                  <button key={value}
+                    className={`feeling-btn ${log.pachinko_feeling_after === value ? "active" : ""}`}
+                    onClick={() => patch({ pachinko_feeling_after: value })}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="pachinko-section">
+              <div className="pachinko-label">その後、何分前進できた？</div>
+              <div className="minutes-selector">
+                {CREATION_MINUTES.map((m) => (
+                  <button key={m}
+                    className={`minutes-btn ${log.pachinko_creation_minutes_after === m ? "active" : ""}`}
+                    onClick={() => patch({ pachinko_creation_minutes_after: m })}>
+                    {m === 0 ? "0分" : `${m}分`}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 睡眠・気分サマリー */}
+        <div className="card summary-card">
+          <div className="summary-row">
+            <span className="summary-item">😴 睡眠 <strong>{log.sleep_hours}h</strong></span>
+            <span className="summary-item">気分 <strong>{["", "😞", "😕", "😐", "🙂", "😄"][log.mood_score]}</strong></span>
+            <span className="summary-item">残業 <strong>{log.overtime_hours}h</strong></span>
+          </div>
+        </div>
+
         <div className="dashboard-actions">
           <Link to={`/log/edit/${log.id}`} className="btn btn-primary">詳細を編集</Link>
-          <Link to="/logs" className="btn btn-accent">ログ一覧</Link>
+          <Link to="/calendar" className="btn btn-accent">カレンダー</Link>
         </div>
 
       </div>

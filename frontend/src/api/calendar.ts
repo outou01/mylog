@@ -32,8 +32,35 @@ export interface WeekCompare {
   aria_comment: string;
 }
 
+export interface ActivityHours {
+  create_hours: number;
+  workout_hours: number;
+  study_hours: number;
+  code_hours: number;
+  job_search_hours: number;
+  total_advance_hours: number;
+}
+
+export interface WeekHoursCompare {
+  this_week: ActivityHours;
+  last_week: ActivityHours;
+  week_start: string;
+  last_week_start: string;
+}
+
+export interface PatternInsight {
+  insights: string[];
+  aria_comment: string;
+}
+
 export const fetchMonthCalendar = (year: number, month: number) =>
   api.get<DayCell[]>("/calendar/month", { params: { year, month } }).then((r) => r.data);
 
 export const fetchWeekCompare = () =>
   api.get<WeekCompare>("/calendar/compare").then((r) => r.data);
+
+export const fetchWeeklyHours = () =>
+  api.get<WeekHoursCompare>("/calendar/weekly-hours").then((r) => r.data);
+
+export const fetchPatterns = () =>
+  api.get<PatternInsight>("/calendar/patterns").then((r) => r.data);

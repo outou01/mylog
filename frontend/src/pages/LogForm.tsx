@@ -33,6 +33,11 @@ const EMPTY_FORM = {
   did_nothing: false,
   discharge_activities: "",
   memo: "",
+  create_hours: 0,
+  workout_hours: 0,
+  study_hours: 0,
+  code_hours: 0,
+  job_search_hours: 0,
 };
 
 type FormState = typeof EMPTY_FORM;
@@ -202,14 +207,23 @@ export default function LogForm() {
           </div>
         </div>
 
-        <div className="form-row toggle-row">
-          <label style={{ width: "100%", color: "var(--accent)", fontSize: "0.8rem", marginBottom: "0.5rem" }}>⚔ 前進ポイント</label>
-          {PROGRESS_ITEMS.map(([key, label]) => (
-            <label key={key} className={`toggle ${form[key] ? "on" : ""}`}>
-              <input type="checkbox" checked={!!form[key]}
-                onChange={(e) => set(key, e.target.checked as FormState[typeof key])} />
-              {label}
-            </label>
+        <div className="form-row">
+          <label style={{ color: "var(--accent)", fontSize: "0.8rem" }}>⚔ 前進クエスト（時間）</label>
+          {[
+            ["create_hours", "🎨 創作"],
+            ["workout_hours", "💪 筋トレ"],
+            ["code_hours", "💻 開発"],
+            ["study_hours", "📚 勉強"],
+            ["job_search_hours", "💼 転職活動"],
+          ].map(([key, label]) => (
+            <div key={key} style={{ display: "flex", alignItems: "center", gap: "0.75rem", padding: "0.4rem 0" }}>
+              <span style={{ width: "110px", fontSize: "0.88rem" }}>{label}</span>
+              <input type="range" min={0} max={4} step={0.5}
+                value={(form as Record<string, number>)[key] ?? 0}
+                onChange={(e) => set(key as keyof FormState, parseFloat(e.target.value) as FormState[keyof FormState])}
+                style={{ flex: 1 }} />
+              <span className="val" style={{ width: "30px" }}>{(form as Record<string, number>)[key] ?? 0}h</span>
+            </div>
           ))}
         </div>
 

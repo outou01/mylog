@@ -28,6 +28,14 @@ def _migrate():
         ("discharge_activities", "TEXT"),
         ("victory_condition", "TEXT"),
         ("victory_achieved", "BOOLEAN DEFAULT FALSE"),
+        ("create_hours", "FLOAT DEFAULT 0.0"),
+        ("workout_hours", "FLOAT DEFAULT 0.0"),
+        ("study_hours", "FLOAT DEFAULT 0.0"),
+        ("code_hours", "FLOAT DEFAULT 0.0"),
+        ("job_search_hours", "FLOAT DEFAULT 0.0"),
+        ("pachinko_reason", "TEXT"),
+        ("pachinko_feeling_after", "VARCHAR(20)"),
+        ("pachinko_creation_minutes_after", "INTEGER"),
     ]
     with engine.connect() as conn:
         for col_name, col_def in new_cols:

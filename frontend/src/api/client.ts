@@ -41,6 +41,14 @@ export interface DailyLog {
   discharge_activities: string | null;
   victory_condition: string | null;
   victory_achieved: boolean;
+  create_hours: number;
+  workout_hours: number;
+  study_hours: number;
+  code_hours: number;
+  job_search_hours: number;
+  pachinko_reason: string | null;
+  pachinko_feeling_after: string | null;
+  pachinko_creation_minutes_after: number | null;
   created_at: string;
   updated_at: string;
   ai_review: AiReview | null;

@@ -28,6 +28,14 @@ class DailyLogCreate(BaseModel):
     discharge_activities: str | None = None
     victory_condition: str | None = None
     victory_achieved: bool = False
+    create_hours: float = 0.0
+    workout_hours: float = 0.0
+    study_hours: float = 0.0
+    code_hours: float = 0.0
+    job_search_hours: float = 0.0
+    pachinko_reason: str | None = None
+    pachinko_feeling_after: str | None = None
+    pachinko_creation_minutes_after: int | None = None
 
 
 class DailyLogUpdate(BaseModel):
@@ -55,6 +63,14 @@ class DailyLogUpdate(BaseModel):
     discharge_activities: str | None = None
     victory_condition: str | None = None
     victory_achieved: bool | None = None
+    create_hours: float | None = None
+    workout_hours: float | None = None
+    study_hours: float | None = None
+    code_hours: float | None = None
+    job_search_hours: float | None = None
+    pachinko_reason: str | None = None
+    pachinko_feeling_after: str | None = None
+    pachinko_creation_minutes_after: int | None = None
 
 
 class AiReviewOut(BaseModel):
@@ -98,6 +114,14 @@ class DailyLogOut(BaseModel):
     discharge_activities: str | None
     victory_condition: str | None
     victory_achieved: bool
+    create_hours: float
+    workout_hours: float
+    study_hours: float
+    code_hours: float
+    job_search_hours: float
+    pachinko_reason: str | None
+    pachinko_feeling_after: str | None
+    pachinko_creation_minutes_after: int | None
     created_at: datetime
     updated_at: datetime
     ai_review: AiReviewOut | None = None
