@@ -4,6 +4,7 @@ import LogForm from "./pages/LogForm";
 import LogList from "./pages/LogList";
 import WeeklyReport from "./pages/WeeklyReport";
 import Briefing from "./pages/Briefing";
+import Calendar from "./pages/Calendar";
 import "./App.css";
 
 export default function App() {
@@ -13,11 +14,12 @@ export default function App() {
         <div className="container header-inner">
           <span className="logo">⚔ AI Life Console</span>
           <nav className="nav">
-            <NavLink to="/" end>Dashboard</NavLink>
-            <NavLink to="/log">Log入力</NavLink>
-            <NavLink to="/logs">ログ一覧</NavLink>
-            <NavLink to="/weekly">週次レポート</NavLink>
-            <NavLink to="/briefing">週末ブリーフィング</NavLink>
+            <NavLink to="/" end>ホーム</NavLink>
+            <NavLink to="/log">ログ入力</NavLink>
+            <NavLink to="/calendar">カレンダー</NavLink>
+            <NavLink to="/logs">一覧</NavLink>
+            <NavLink to="/weekly">週次</NavLink>
+            <NavLink to="/briefing">週末</NavLink>
           </nav>
         </div>
       </header>
@@ -28,6 +30,7 @@ export default function App() {
             <Route path="/log" element={<LogForm />} />
             <Route path="/log/edit/:id" element={<LogForm />} />
             <Route path="/logs" element={<LogList />} />
+            <Route path="/calendar" element={<Calendar />} />
             <Route path="/weekly" element={<WeeklyReport />} />
             <Route path="/briefing" element={<Briefing />} />
           </Routes>

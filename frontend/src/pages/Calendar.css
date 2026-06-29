@@ -1,0 +1,206 @@
+.calendar-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+/* カレンダーカード */
+.cal-card {}
+
+.cal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+}
+.cal-title { font-size: 1.1rem; font-weight: 700; margin: 0; }
+.cal-nav-btn {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  width: 36px; height: 36px;
+  border-radius: 8px;
+  font-size: 1.2rem;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s;
+}
+.cal-nav-btn:hover { background: var(--accent); color: var(--bg); }
+
+.cal-grid-header {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  margin-bottom: 4px;
+}
+.cal-wday {
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  padding: 4px 0;
+}
+.cal-wday.weekend { color: #f97316; }
+
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.cal-cell {
+  min-height: 72px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  padding: 4px 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+  position: relative;
+  background: var(--surface);
+}
+.cal-cell.empty { background: transparent; border-color: transparent; cursor: default; }
+.cal-cell:not(.empty):hover { background: var(--surface2); }
+.cal-cell.today { border-color: var(--accent) !important; background: rgba(96, 165, 250, 0.08); }
+.cal-cell.weekend .cal-day-num { color: #f97316; }
+.cal-cell.has-log { border-width: 2px; }
+
+.cal-day-num {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 3px;
+}
+.cal-mood-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  position: absolute;
+  top: 6px; right: 6px;
+}
+.cal-energy {
+  font-size: 0.65rem;
+  padding: 1px 4px;
+  border-radius: 4px;
+  display: inline-block;
+  margin-bottom: 2px;
+}
+.cal-energy.energy-1 { background: rgba(239,68,68,0.2); color: #ef4444; }
+.cal-energy.energy-2 { background: rgba(107,114,128,0.2); color: var(--text-muted); }
+.cal-energy.energy-3 { background: rgba(74,222,128,0.2); color: #4ade80; }
+
+.cal-flags {
+  font-size: 0.7rem;
+  display: flex;
+  gap: 1px;
+  flex-wrap: wrap;
+}
+.cal-sleep {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  margin-top: 2px;
+}
+
+.cal-legend {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+.legend-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+/* 今週vs先週 */
+.compare-card {}
+.compare-header { margin-bottom: 1rem; }
+.compare-title { font-size: 1rem; font-weight: 700; }
+
+.aria-compare-bubble {
+  background: var(--surface2);
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1.25rem;
+  line-height: 1.7;
+}
+.aria-mini-face {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--accent);
+  margin-bottom: 0.4rem;
+  font-family: var(--font-mono);
+}
+
+.compare-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+@media (max-width: 480px) {
+  .compare-grid { grid-template-columns: 1fr; }
+}
+
+.stat-diff {
+  background: var(--surface2);
+  border-radius: 10px;
+  padding: 0.6rem 0.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.stat-diff-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+.stat-diff-values {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+.stat-this {
+  font-size: 1.1rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+}
+.stat-last {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+.stat-diff-badge {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 6px;
+  width: fit-content;
+}
+.stat-diff-badge.improved { background: rgba(74,222,128,0.15); color: #4ade80; }
+.stat-diff-badge.worsened { background: rgba(239,68,68,0.15); color: #ef4444; }
+
+.compare-weeks {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+.compare-week-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.no-data {
+  color: var(--text-muted);
+  text-align: center;
+  padding: 2rem;
+}

@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import inspect, text
 
 from app.database import Base, engine
-from app.routers import ai_reviews, aria, briefing, daily_logs, quick_log, weekly_report
+from app.routers import ai_reviews, aria, briefing, calendar, daily_logs, quick_log, weekly_report
 
 Base.metadata.create_all(bind=engine)
 
@@ -53,6 +53,7 @@ app.include_router(quick_log.router)
 app.include_router(weekly_report.router)
 app.include_router(briefing.router)
 app.include_router(aria.router)
+app.include_router(calendar.router)
 
 
 @app.get("/health")
