@@ -247,5 +247,7 @@ def get_aria_message(db: Session = Depends(get_db)):
         print(f"[Aria] AI error: {e}")
         result = _fallback(log, recent_logs)
 
-    _cache[cache_key] = (result, now)
+    # ログが存在するときだけキャッシュ（「まだ登録されていません」はキャッシュしない）
+    if log is not None:
+        _cache[cache_key] = (result, now)
     return result
