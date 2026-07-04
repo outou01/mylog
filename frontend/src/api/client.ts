@@ -183,8 +183,19 @@ export interface DashboardHome {
     last_touched_label: string;
     next_action: string;
     estimated_minutes: number;
+    status: string;
     memo: string | null;
   };
+  projects: Array<{
+    id: number;
+    title: string;
+    reason: string;
+    last_touched_label: string;
+    next_action: string;
+    estimated_minutes: number;
+    status: string;
+    memo: string | null;
+  }>;
   life_gauge: {
     work_percent: number;
     self_percent: number;
@@ -194,8 +205,35 @@ export interface DashboardHome {
     title: string;
     note: string | null;
   }>;
+  aria: {
+    name: string;
+    face: string;
+    mood: "normal" | "worried" | "proud" | "steady" | string;
+    message: string;
+  };
   aria_message: string;
 }
 
 export const fetchDashboardHome = () =>
   api.get<DashboardHome>("/dashboard/home").then((r) => r.data);
+
+export interface DashboardProjectPayload {
+  title: string;
+  reason: string;
+  next_action: string;
+  estimated_minutes: number;
+  memo: string | null;
+  status: string;
+}
+
+export const updateDashboardPurpose = (text: string) =>
+  api.patch<{ text: string }>("/dashboard/purpose", { text }).then((r) => r.data);
+
+export const createDashboardProject = (data: DashboardProjectPayload) =>
+  api.post<DashboardHome["current_project"]>("/dashboard/projects", data).then((r) => r.data);
+
+export const updateDashboardProject = (id: number, data: DashboardProjectPayload) =>
+  api.patch<DashboardHome["current_project"]>(`/dashboard/projects/${id}`, data).then((r) => r.data);
+
+export const activateDashboardProject = (id: number) =>
+  api.post<DashboardHome["current_project"]>(`/dashboard/projects/${id}/activate`).then((r) => r.data);

@@ -31,16 +31,43 @@
   background: linear-gradient(135deg, rgba(35, 52, 47, 0.98), rgba(37, 31, 26, 0.98));
 }
 
-.aria-mark {
+.aria-avatar {
   display: grid;
   place-items: center;
-  width: 56px;
-  height: 56px;
+  min-width: 82px;
+  min-height: 72px;
   border: 1px solid rgba(255, 218, 160, 0.35);
-  border-radius: 50%;
+  border-radius: 8px;
   color: #ffd9a3;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.aria-avatar.worried {
+  color: #f1c27d;
+  border-color: rgba(241, 194, 125, 0.45);
+}
+
+.aria-avatar.proud {
+  color: #b9e28b;
+  border-color: rgba(185, 226, 139, 0.42);
+}
+
+.aria-avatar.steady {
+  color: #9fc9d8;
+  border-color: rgba(159, 201, 216, 0.42);
+}
+
+.aria-face {
   font-family: var(--font-mono);
-  font-size: 0.88rem;
+  font-size: 1.05rem;
+  white-space: nowrap;
+}
+
+.aria-name {
+  color: #d6c7a8;
+  font-size: 0.74rem;
+  font-weight: 800;
+  margin-top: 0.2rem;
 }
 
 .aria-line {
@@ -113,6 +140,18 @@
 
 .purpose-card {
   background: linear-gradient(135deg, rgba(38, 45, 39, 0.98), rgba(28, 32, 37, 0.98));
+}
+
+.section-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+  margin-bottom: 0.55rem;
+}
+
+.section-head .eyebrow {
+  margin-bottom: 0;
 }
 
 .purpose-lines {
@@ -209,6 +248,139 @@
   transform: translateY(-1px);
 }
 
+.continue-actions {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 0.6rem;
+  align-items: center;
+  margin-top: 1rem;
+}
+
+.continue-actions .continue-button {
+  margin-top: 0;
+}
+
+.console-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  border: 1px solid rgba(221, 205, 171, 0.25);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #e9dfc8;
+  font-size: 0.84rem;
+  font-weight: 800;
+  padding: 0.4rem 0.75rem;
+  transition: background 0.14s ease, border-color 0.14s ease;
+}
+
+.console-button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(221, 205, 171, 0.45);
+}
+
+.console-button.primary {
+  background: #d8b05f;
+  border-color: #d8b05f;
+  color: #19140d;
+}
+
+.console-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.console-form {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 0.85rem;
+}
+
+.console-form label {
+  display: grid;
+  gap: 0.35rem;
+  color: #c9d4c4;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.console-form input,
+.console-form textarea,
+.console-form select {
+  width: 100%;
+  border: 1px solid rgba(232, 220, 195, 0.16);
+  border-radius: 6px;
+  background: rgba(7, 12, 14, 0.64);
+  color: #f4efe5;
+  font: inherit;
+  line-height: 1.5;
+  padding: 0.65rem 0.7rem;
+}
+
+.console-form input:focus,
+.console-form textarea:focus,
+.console-form select:focus {
+  border-color: rgba(216, 176, 95, 0.72);
+  outline: none;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.project-editor {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 1rem;
+}
+
+.project-list {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.project-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.75rem;
+  align-items: center;
+  border: 1px solid rgba(232, 220, 195, 0.12);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.12);
+  padding: 0.75rem;
+}
+
+.project-row.active {
+  border-color: rgba(216, 176, 95, 0.45);
+  background: rgba(216, 176, 95, 0.08);
+}
+
+.project-row strong,
+.project-row span {
+  display: block;
+}
+
+.project-row strong {
+  color: #f5eddc;
+  font-size: 0.95rem;
+  margin-bottom: 0.2rem;
+}
+
+.project-row span {
+  color: #aebdac;
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
 .life-gauges {
   display: grid;
   gap: 1rem;
@@ -299,6 +471,11 @@
     grid-template-columns: 1fr;
   }
 
+  .aria-avatar {
+    justify-items: start;
+    min-height: 64px;
+  }
+
   .continue-top {
     flex-direction: column;
   }
@@ -309,5 +486,11 @@
 
   .timeline-list li {
     grid-template-columns: 52px 1fr;
+  }
+
+  .continue-actions,
+  .project-row,
+  .form-grid {
+    grid-template-columns: 1fr;
   }
 }
