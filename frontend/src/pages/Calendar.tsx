@@ -1,7 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  autoPlanWeek,
   createScheduleBlock,
   deleteScheduleBlock,
   fetchMonthCalendar,
@@ -30,12 +29,18 @@ const MOOD_COLOR: Record<number, string> = {
 
 type Tab = "schedule" | "month" | "hours" | "patterns";
 
+const SCHEDULE_CATEGORIES = [
+  { key: "creation", label: "創作", shortLabel: "創作" },
+  { key: "job_search", label: "転職活動", shortLabel: "転職" },
+  { key: "learning", label: "学習", shortLabel: "学習" },
+];
+
 const emptyForm: ScheduleBlockPayload = {
   date: "",
   start_time: "20:30",
   end_time: "21:00",
-  title: "自分の畑",
-  category: "self",
+  title: "創作",
+  category: "creation",
   note: "",
 };
 
@@ -184,7 +189,7 @@ export default function Calendar() {
     }
   };
 
-  const quickDuration = async (durationMinutes: number) => {
+  const quickDuration = async (category: (typeof SCHEDULE_CATEGORIES)[number], durationMinutes: number) => {
     const slot = currentHalfHourSlot(durationMinutes);
     setSaving(true);
     try {
@@ -192,8 +197,8 @@ export default function Calendar() {
         date: today,
         start_time: slot.start_time,
         end_time: slot.end_time,
-        title: durationMinutes === 30 ? "畑 30分" : "畑 1時間",
-        category: "self",
+        title: `${category.shortLabel} ${durationMinutes === 30 ? "30分" : "1時間"}`,
+        category: category.key,
         note: null,
       });
       await loadSchedule();
@@ -254,16 +259,16 @@ export default function Calendar() {
             </div>
 
             <div className="schedule-actions">
-              <button className="schedule-btn primary" onClick={() => autoPlanWeek(weekStart).then(setSchedule)} disabled={saving}>
-                今週の畑枠を自動配置
-              </button>
-              <button className="schedule-btn quick" onClick={() => quickDuration(30)} disabled={saving}>今から30分</button>
-              <button className="schedule-btn quick" onClick={() => quickDuration(60)} disabled={saving}>今から1時間</button>
+              {SCHEDULE_CATEGORIES.map((category) => (
+                <div className={`quick-category ${category.key}`} key={category.key}>
+                  <span>{category.label}</span>
+                  <button className="schedule-btn quick" onClick={() => quickDuration(category, 30)} disabled={saving}>30分</button>
+                  <button className="schedule-btn quick" onClick={() => quickDuration(category, 60)} disabled={saving}>1時間</button>
+                </div>
+              ))}
             </div>
 
-            <p className="schedule-note">
-              平日9:30-18:30は自動で仕事として表示します。編集するのは、それ以外に置く「自分の畑」だけで大丈夫です。
-            </p>
+            <p className="schedule-note">{schedule.schedule_message || "仕事以外の時間は、余りものではなく人生の本体です。 ※自動生成"}</p>
           </section>
 
           <section className="schedule-layout">
@@ -341,9 +346,9 @@ export default function Calendar() {
               <label>
                 種類
                 <select value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })}>
-                  <option value="self">自分の畑</option>
-                  <option value="life">生活</option>
-                  <option value="rest">休憩</option>
+                  {SCHEDULE_CATEGORIES.map((category) => (
+                    <option value={category.key} key={category.key}>{category.label}</option>
+                  ))}
                 </select>
               </label>
               <label>

@@ -69,6 +69,7 @@ export interface WeekSchedule {
   week_end: string;
   day_start_hour: number;
   day_end_hour: number;
+  schedule_message: string;
   blocks: ScheduleBlock[];
 }
 

@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from datetime import date, datetime, time, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field, field_validator
@@ -7,6 +8,8 @@ from app.database import get_db
 from app.models import DailyLog, ScheduleBlock
 
 router = APIRouter(prefix="/calendar", tags=["calendar"])
+
+_schedule_message_cache: dict[str, str] = {}
 
 
 class DayCell(BaseModel):
@@ -76,6 +79,7 @@ class WeekScheduleOut(BaseModel):
     week_end: str
     day_start_hour: int
     day_end_hour: int
+    schedule_message: str
     blocks: list[ScheduleBlockOut]
 
 
@@ -126,6 +130,54 @@ def _work_blocks(start: date) -> list[ScheduleBlockOut]:
     return blocks
 
 
+def _fallback_schedule_message(today: date) -> str:
+    messages = [
+        "仕事以外の時間は、余りものではなく人生の本体です。今日は小さくても、自分のための枠を先に置きましょう。",
+        "予定に入っていない自分時間は、仕事の疲れに溶けやすいです。30分だけでも、先に場所を作りましょう。",
+        "人生は大きな決意より、守れた小さな時間で変わります。今日の畑をひと枠だけ確保しましょう。",
+        "仕事は固定ブロック。自分の時間は選べるブロックです。選べる場所に、あなたの人生を置きましょう。",
+        "平日の夜や週末の端に、自分の未来は隠れています。見える予定にすると、戻りやすくなります。",
+    ]
+    return messages[today.toordinal() % len(messages)]
+
+
+def _schedule_message(today: date) -> str:
+    from app.ai_client import chat
+
+    cache_key = today.isoformat()
+    if cache_key in _schedule_message_cache:
+        return _schedule_message_cache[cache_key]
+
+    prompt = """
+あなたはライフダッシュボードのナビゲーター「アリア」です。
+仕事以外の時間を充実させる重要性を、短い格言のように日本語で1文だけ返してください。
+条件:
+- 90文字以内
+- 説教ではなく、静かに前向き
+- 「仕事以外の時間」「自分の時間」「人生」のどれかに触れる
+- 引用符や箇条書きは不要
+"""
+    executor = ThreadPoolExecutor(max_workers=1)
+    future = executor.submit(chat, prompt, 0.9)
+    try:
+        raw = future.result(timeout=1.8)
+    except TimeoutError:
+        future.cancel()
+        executor.shutdown(wait=False, cancel_futures=True)
+        raw = None
+    except Exception:
+        raw = None
+    finally:
+        if future.done():
+            executor.shutdown(wait=False, cancel_futures=True)
+    if not raw:
+        message = f"{_fallback_schedule_message(today)} ※自動生成"
+    else:
+        message = raw.strip().replace("\n", " ")[:120]
+    _schedule_message_cache[cache_key] = message
+    return message
+
+
 def _schedule_out(block: ScheduleBlock) -> ScheduleBlockOut:
     return ScheduleBlockOut(
         id=block.id,
@@ -143,6 +195,7 @@ def _schedule_out(block: ScheduleBlock) -> ScheduleBlockOut:
 def get_schedule_week(week_start: date | None = None, db: Session = Depends(get_db)):
     start = _week_start(week_start or date.today())
     end = start + timedelta(days=6)
+    today = date.today()
     blocks = (
         db.query(ScheduleBlock)
         .filter(ScheduleBlock.date >= start, ScheduleBlock.date <= end)
@@ -154,6 +207,7 @@ def get_schedule_week(week_start: date | None = None, db: Session = Depends(get_
         week_end=end.isoformat(),
         day_start_hour=6,
         day_end_hour=24,
+        schedule_message=_schedule_message(today),
         blocks=_work_blocks(start) + [_schedule_out(block) for block in blocks],
     )
 
