@@ -142,6 +142,11 @@
     );
 }
 
+.day-lane.drop-ready {
+  outline: 1px dashed rgba(216, 176, 95, 0.28);
+  outline-offset: -3px;
+}
+
 .schedule-block {
   position: absolute;
   left: 5px;
@@ -159,6 +164,15 @@
   text-align: left;
   font-size: 0.72rem;
   line-height: 1.25;
+}
+
+.schedule-block[draggable="true"] {
+  cursor: grab;
+}
+
+.schedule-block.dragging {
+  opacity: 0.58;
+  cursor: grabbing;
 }
 
 .schedule-block span {

@@ -118,6 +118,7 @@ export default function Calendar() {
   const [schedule, setSchedule] = useState<WeekSchedule | null>(null);
   const [form, setForm] = useState<ScheduleBlockPayload>({ ...emptyForm, date: today });
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [draggingId, setDraggingId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
 
   const [monthCells, setMonthCells] = useState<any[]>([]);
@@ -193,10 +194,40 @@ export default function Calendar() {
         end_time: slot.end_time,
         title: durationMinutes === 30 ? "畑 30分" : "畑 1時間",
         category: "self",
-        note: "現在時刻を30分単位に丸めて登録した枠。",
+        note: null,
       });
       await loadSchedule();
     } finally {
+      setSaving(false);
+    }
+  };
+
+  const moveDraggedBlock = async (dateText: string, clientY: number, lane: HTMLDivElement) => {
+    if (!schedule || draggingId == null) return;
+    const block = schedule.blocks.find((item) => item.id === draggingId);
+    if (!block || block.id == null || !block.editable) return;
+
+    const rect = lane.getBoundingClientRect();
+    const ratio = Math.max(0, Math.min(1, (clientY - rect.top) / rect.height));
+    const dayStart = schedule.day_start_hour * 60;
+    const dayEnd = schedule.day_end_hour * 60;
+    const total = dayEnd - dayStart;
+    const duration = Math.max(30, minutesOf(block.end_time) - minutesOf(block.start_time));
+    let start = dayStart + Math.floor((ratio * total) / 30) * 30;
+    if (start + duration > dayEnd) start = dayEnd - duration;
+    start = Math.max(dayStart, start);
+
+    setSaving(true);
+    try {
+      await updateScheduleBlock(block.id, {
+        ...toPayload(block),
+        date: dateText,
+        start_time: timeTextFromMinutes(start),
+        end_time: timeTextFromMinutes(start + duration),
+      });
+      await loadSchedule();
+    } finally {
+      setDraggingId(null);
       setSaving(false);
     }
   };
@@ -251,12 +282,29 @@ export default function Calendar() {
                         <span>{WEEKDAYS[index]}</span>
                         <strong>{displayDate(day)}</strong>
                       </div>
-                      <div className="day-lane">
+                      <div
+                        className={`day-lane ${draggingId ? "drop-ready" : ""}`}
+                        onDragOver={(event) => {
+                          if (draggingId != null) event.preventDefault();
+                        }}
+                        onDrop={(event) => {
+                          event.preventDefault();
+                          moveDraggedBlock(day, event.clientY, event.currentTarget);
+                        }}
+                      >
                         {dayBlocks.map((block, blockIndex) => (
                           <button
                             key={`${block.id ?? "work"}-${block.date}-${block.start_time}-${blockIndex}`}
-                            className={`schedule-block ${block.category} ${block.editable ? "editable" : ""}`}
+                            className={`schedule-block ${block.category} ${block.editable ? "editable" : ""} ${draggingId === block.id ? "dragging" : ""}`}
                             style={blockStyle(block, schedule)}
+                            draggable={block.editable}
+                            onDragStart={(event) => {
+                              if (!block.editable || block.id == null) return;
+                              setDraggingId(block.id);
+                              event.dataTransfer.effectAllowed = "move";
+                              event.dataTransfer.setData("text/plain", String(block.id));
+                            }}
+                            onDragEnd={() => setDraggingId(null)}
                             onClick={() => startEdit(block)}
                           >
                             <span>{block.start_time}-{block.end_time}</span>
