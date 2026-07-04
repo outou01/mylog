@@ -12,7 +12,7 @@ export default function App() {
     <div className="app">
       <header className="header">
         <div className="container header-inner">
-          <span className="logo">⚔ AI Life Console</span>
+          <span className="logo">AI Life Console</span>
           <nav className="nav">
             <NavLink to="/" end>ホーム</NavLink>
             <NavLink to="/log">ログ入力</NavLink>

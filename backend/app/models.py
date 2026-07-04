@@ -92,3 +92,37 @@ class WeekendNote(Base):
     week_start: Mapped[date] = mapped_column(Date, unique=True, nullable=False)
     next_action: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class ActiveProject(Base):
+    __tablename__ = "active_projects"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    title: Mapped[str] = mapped_column(String(120), nullable=False)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    last_touched_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
+    next_action: Mapped[str] = mapped_column(Text, nullable=False)
+    estimated_minutes: Mapped[int] = mapped_column(Integer, default=30)
+    status: Mapped[str] = mapped_column(String(20), default="active", index=True)
+    memo: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    events: Mapped[list["ActiveProjectEvent"]] = relationship(
+        "ActiveProjectEvent",
+        back_populates="project",
+        cascade="all, delete-orphan",
+    )
+
+
+class ActiveProjectEvent(Base):
+    __tablename__ = "active_project_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    project_id: Mapped[int] = mapped_column(Integer, ForeignKey("active_projects.id"), nullable=False, index=True)
+    event_date: Mapped[date] = mapped_column(Date, nullable=False)
+    title: Mapped[str] = mapped_column(String(120), nullable=False)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    project: Mapped["ActiveProject"] = relationship("ActiveProject", back_populates="events")

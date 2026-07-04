@@ -166,3 +166,36 @@ export const fetchAriaMessage = () =>
 
 export const fetchVictoryCondition = () =>
   api.get<{ condition: string }>("/aria/victory-condition").then((r) => r.data);
+
+export interface DashboardHome {
+  field: {
+    weekly_minutes: number;
+    progress_percent: number;
+    message: string;
+  };
+  purpose: {
+    text: string;
+  };
+  current_project: {
+    id: number;
+    title: string;
+    reason: string;
+    last_touched_label: string;
+    next_action: string;
+    estimated_minutes: number;
+    memo: string | null;
+  };
+  life_gauge: {
+    work_percent: number;
+    self_percent: number;
+  };
+  timeline: Array<{
+    date_label: string;
+    title: string;
+    note: string | null;
+  }>;
+  aria_message: string;
+}
+
+export const fetchDashboardHome = () =>
+  api.get<DashboardHome>("/dashboard/home").then((r) => r.data);
