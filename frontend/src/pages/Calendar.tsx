@@ -31,8 +31,9 @@ type Tab = "schedule" | "month" | "hours" | "patterns";
 
 const SCHEDULE_CATEGORIES = [
   { key: "creation", label: "創作", shortLabel: "創作" },
+  { key: "workout", label: "筋トレ", shortLabel: "筋トレ" },
   { key: "job_search", label: "転職活動", shortLabel: "転職" },
-  { key: "learning", label: "学習", shortLabel: "学習" },
+  { key: "social", label: "交流", shortLabel: "交流" },
 ];
 
 const emptyForm: ScheduleBlockPayload = {

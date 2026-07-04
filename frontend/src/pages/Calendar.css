@@ -64,7 +64,7 @@
 
 .schedule-actions {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.6rem;
 }
 
@@ -89,12 +89,16 @@
   border-color: rgba(190, 140, 218, 0.32);
 }
 
-.quick-category.job_search {
-  border-color: rgba(235, 159, 98, 0.32);
+.quick-category.workout {
+  border-color: rgba(249, 115, 74, 0.34);
 }
 
-.quick-category.learning {
-  border-color: rgba(90, 174, 190, 0.32);
+.quick-category.job_search {
+  border-color: rgba(93, 156, 236, 0.34);
+}
+
+.quick-category.social {
+  border-color: rgba(88, 183, 123, 0.34);
 }
 
 .schedule-note {
@@ -226,14 +230,19 @@
   border-color: rgba(211, 166, 237, 0.46);
 }
 
-.schedule-block.job_search {
-  background: rgba(168, 105, 56, 0.58);
-  border-color: rgba(240, 177, 112, 0.48);
+.schedule-block.workout {
+  background: rgba(186, 82, 52, 0.58);
+  border-color: rgba(249, 154, 116, 0.5);
 }
 
-.schedule-block.learning {
-  background: rgba(45, 124, 143, 0.58);
-  border-color: rgba(125, 213, 229, 0.46);
+.schedule-block.job_search {
+  background: rgba(54, 105, 170, 0.58);
+  border-color: rgba(130, 185, 245, 0.48);
+}
+
+.schedule-block.social {
+  background: rgba(58, 132, 85, 0.58);
+  border-color: rgba(127, 219, 160, 0.46);
 }
 
 .schedule-block.life {

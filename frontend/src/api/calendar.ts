@@ -82,6 +82,29 @@ export interface ScheduleBlockPayload {
   note: string | null;
 }
 
+export interface TimeCategoryTotal {
+  key: string;
+  label: string;
+  color: string;
+  minutes: number;
+  hours: number;
+}
+
+export interface TimeAnalysisSection {
+  label: string;
+  start_date: string;
+  end_date: string;
+  total_minutes: number;
+  categories: TimeCategoryTotal[];
+}
+
+export interface TimeAnalysis {
+  selected_date: string;
+  daily: TimeAnalysisSection;
+  weekly: TimeAnalysisSection;
+  monthly: TimeAnalysisSection;
+}
+
 export const fetchMonthCalendar = (year: number, month: number) =>
   api.get<DayCell[]>("/calendar/month", { params: { year, month } }).then((r) => r.data);
 
@@ -96,6 +119,9 @@ export const fetchPatterns = () =>
 
 export const fetchWeekSchedule = (week_start?: string) =>
   api.get<WeekSchedule>("/calendar/schedule-week", { params: { week_start } }).then((r) => r.data);
+
+export const fetchTimeAnalysis = (target_date?: string) =>
+  api.get<TimeAnalysis>("/calendar/time-analysis", { params: { target_date } }).then((r) => r.data);
 
 export const createScheduleBlock = (data: ScheduleBlockPayload) =>
   api.post<ScheduleBlock>("/calendar/schedule-blocks", data).then((r) => r.data);

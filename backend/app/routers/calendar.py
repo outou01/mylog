@@ -61,6 +61,29 @@ class PatternInsight(BaseModel):
     aria_comment: str
 
 
+class TimeCategoryTotal(BaseModel):
+    key: str
+    label: str
+    color: str
+    minutes: int
+    hours: float
+
+
+class TimeAnalysisSection(BaseModel):
+    label: str
+    start_date: str
+    end_date: str
+    total_minutes: int
+    categories: list[TimeCategoryTotal]
+
+
+class TimeAnalysisOut(BaseModel):
+    selected_date: str
+    daily: TimeAnalysisSection
+    weekly: TimeAnalysisSection
+    monthly: TimeAnalysisSection
+
+
 class ScheduleBlockOut(BaseModel):
     id: int | None
     date: str
@@ -107,8 +130,22 @@ def _time_str(value: time) -> str:
     return value.strftime("%H:%M")
 
 
+def _minutes_between(start: time, end: time) -> int:
+    start_minutes = start.hour * 60 + start.minute
+    end_minutes = end.hour * 60 + end.minute
+    return max(0, end_minutes - start_minutes)
+
+
 def _week_start(target: date) -> date:
     return target - timedelta(days=target.weekday())
+
+
+TIME_CATEGORIES = [
+    {"key": "creation", "label": "創作", "color": "#a970d6"},
+    {"key": "workout", "label": "筋トレ", "color": "#f9734a"},
+    {"key": "job_search", "label": "転職活動", "color": "#5d9cec"},
+    {"key": "social", "label": "交流", "color": "#58b77b"},
+]
 
 
 def _work_blocks(start: date) -> list[ScheduleBlockOut]:
@@ -209,6 +246,71 @@ def _schedule_out(block: ScheduleBlock) -> ScheduleBlockOut:
         category=block.category,
         note=block.note,
         editable=True,
+    )
+
+
+def _time_analysis_section(label: str, start: date, end: date, db: Session) -> TimeAnalysisSection:
+    totals = {category["key"]: 0 for category in TIME_CATEGORIES}
+    blocks = (
+        db.query(ScheduleBlock)
+        .filter(
+            ScheduleBlock.date >= start,
+            ScheduleBlock.date <= end,
+            ScheduleBlock.category.in_(totals.keys()),
+        )
+        .all()
+    )
+    for block in blocks:
+        totals[block.category] += _minutes_between(block.start_time, block.end_time)
+
+    categories = [
+        TimeCategoryTotal(
+            key=category["key"],
+            label=category["label"],
+            color=category["color"],
+            minutes=totals[category["key"]],
+            hours=round(totals[category["key"]] / 60, 1),
+        )
+        for category in TIME_CATEGORIES
+    ]
+    return TimeAnalysisSection(
+        label=label,
+        start_date=start.isoformat(),
+        end_date=end.isoformat(),
+        total_minutes=sum(totals.values()),
+        categories=categories,
+    )
+
+
+@router.get("/time-analysis", response_model=TimeAnalysisOut)
+def get_time_analysis(target_date: date | None = None, db: Session = Depends(get_db)):
+    from calendar import monthrange
+
+    selected = target_date or date.today()
+    week_start = _week_start(selected)
+    month_start = selected.replace(day=1)
+    month_end = selected.replace(day=monthrange(selected.year, selected.month)[1])
+
+    return TimeAnalysisOut(
+        selected_date=selected.isoformat(),
+        daily=_time_analysis_section(
+            selected.strftime("%Y/%m/%d"),
+            selected,
+            selected,
+            db,
+        ),
+        weekly=_time_analysis_section(
+            f"{week_start.strftime('%Y/%m/%d')}〜{(week_start + timedelta(days=6)).strftime('%m/%d')}",
+            week_start,
+            week_start + timedelta(days=6),
+            db,
+        ),
+        monthly=_time_analysis_section(
+            selected.strftime("%Y/%m"),
+            month_start,
+            month_end,
+            db,
+        ),
     )
 
 
