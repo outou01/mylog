@@ -1,10 +1,10 @@
-from datetime import date, timedelta
-from fastapi import APIRouter, Depends
-from pydantic import BaseModel
+from datetime import date, datetime, time, timedelta
+from fastapi import APIRouter, Depends, HTTPException, Response
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import DailyLog
+from app.models import DailyLog, ScheduleBlock
 
 router = APIRouter(prefix="/calendar", tags=["calendar"])
 
@@ -58,6 +58,186 @@ class WeekHoursCompare(BaseModel):
 class PatternInsight(BaseModel):
     insights: list[str]
     aria_comment: str
+
+
+class ScheduleBlockOut(BaseModel):
+    id: int | None
+    date: str
+    start_time: str
+    end_time: str
+    title: str
+    category: str
+    note: str | None = None
+    editable: bool = True
+
+
+class WeekScheduleOut(BaseModel):
+    week_start: str
+    week_end: str
+    day_start_hour: int
+    day_end_hour: int
+    blocks: list[ScheduleBlockOut]
+
+
+class ScheduleBlockPayload(BaseModel):
+    date: date
+    start_time: str
+    end_time: str
+    title: str = Field(min_length=1, max_length=120)
+    category: str = Field(default="self", max_length=40)
+    note: str | None = Field(default=None, max_length=2000)
+
+    @field_validator("start_time", "end_time")
+    @classmethod
+    def validate_time(cls, value: str) -> str:
+        try:
+            datetime.strptime(value, "%H:%M")
+        except ValueError as exc:
+            raise ValueError("Use HH:MM format") from exc
+        return value
+
+
+def _parse_time(value: str) -> time:
+    return datetime.strptime(value, "%H:%M").time()
+
+
+def _time_str(value: time) -> str:
+    return value.strftime("%H:%M")
+
+
+def _week_start(target: date) -> date:
+    return target - timedelta(days=target.weekday())
+
+
+def _work_blocks(start: date) -> list[ScheduleBlockOut]:
+    blocks: list[ScheduleBlockOut] = []
+    for offset in range(5):
+        day = start + timedelta(days=offset)
+        blocks.append(ScheduleBlockOut(
+            id=None,
+            date=day.isoformat(),
+            start_time="09:30",
+            end_time="18:30",
+            title="仕事",
+            category="work",
+            note="固定: 平日 9:30-18:30",
+            editable=False,
+        ))
+    return blocks
+
+
+def _schedule_out(block: ScheduleBlock) -> ScheduleBlockOut:
+    return ScheduleBlockOut(
+        id=block.id,
+        date=block.date.isoformat(),
+        start_time=_time_str(block.start_time),
+        end_time=_time_str(block.end_time),
+        title=block.title,
+        category=block.category,
+        note=block.note,
+        editable=True,
+    )
+
+
+@router.get("/schedule-week", response_model=WeekScheduleOut)
+def get_schedule_week(week_start: date | None = None, db: Session = Depends(get_db)):
+    start = _week_start(week_start or date.today())
+    end = start + timedelta(days=6)
+    blocks = (
+        db.query(ScheduleBlock)
+        .filter(ScheduleBlock.date >= start, ScheduleBlock.date <= end)
+        .order_by(ScheduleBlock.date.asc(), ScheduleBlock.start_time.asc())
+        .all()
+    )
+    return WeekScheduleOut(
+        week_start=start.isoformat(),
+        week_end=end.isoformat(),
+        day_start_hour=6,
+        day_end_hour=24,
+        blocks=_work_blocks(start) + [_schedule_out(block) for block in blocks],
+    )
+
+
+@router.post("/schedule-blocks", response_model=ScheduleBlockOut, status_code=201)
+def create_schedule_block(payload: ScheduleBlockPayload, db: Session = Depends(get_db)):
+    start = _parse_time(payload.start_time)
+    end = _parse_time(payload.end_time)
+    if end <= start:
+        raise HTTPException(status_code=400, detail="end_time must be after start_time")
+    block = ScheduleBlock(
+        date=payload.date,
+        start_time=start,
+        end_time=end,
+        title=payload.title,
+        category=payload.category,
+        note=payload.note,
+    )
+    db.add(block)
+    db.commit()
+    db.refresh(block)
+    return _schedule_out(block)
+
+
+@router.patch("/schedule-blocks/{block_id}", response_model=ScheduleBlockOut)
+def update_schedule_block(block_id: int, payload: ScheduleBlockPayload, db: Session = Depends(get_db)):
+    block = db.query(ScheduleBlock).filter(ScheduleBlock.id == block_id).first()
+    if not block:
+        raise HTTPException(status_code=404, detail="Schedule block not found")
+    start = _parse_time(payload.start_time)
+    end = _parse_time(payload.end_time)
+    if end <= start:
+        raise HTTPException(status_code=400, detail="end_time must be after start_time")
+    block.date = payload.date
+    block.start_time = start
+    block.end_time = end
+    block.title = payload.title
+    block.category = payload.category
+    block.note = payload.note
+    db.commit()
+    db.refresh(block)
+    return _schedule_out(block)
+
+
+@router.delete("/schedule-blocks/{block_id}", status_code=204)
+def delete_schedule_block(block_id: int, db: Session = Depends(get_db)):
+    block = db.query(ScheduleBlock).filter(ScheduleBlock.id == block_id).first()
+    if not block:
+        raise HTTPException(status_code=404, detail="Schedule block not found")
+    db.delete(block)
+    db.commit()
+    return Response(status_code=204)
+
+
+@router.post("/schedule-week/auto-plan", response_model=WeekScheduleOut, status_code=201)
+def auto_plan_week(week_start: date | None = None, db: Session = Depends(get_db)):
+    start = _week_start(week_start or date.today())
+    candidates = [
+        (start, "20:30", "21:00", "自分の畑: 30分"),
+        (start + timedelta(days=2), "20:30", "21:00", "自分の畑: 30分"),
+        (start + timedelta(days=4), "20:30", "21:00", "自分の畑: 30分"),
+        (start + timedelta(days=5), "10:00", "11:00", "週末の畑: 60分"),
+    ]
+    for block_date, start_time, end_time, title in candidates:
+        exists = (
+            db.query(ScheduleBlock)
+            .filter(
+                ScheduleBlock.date == block_date,
+                ScheduleBlock.start_time == _parse_time(start_time),
+                ScheduleBlock.title == title,
+            )
+            .first()
+        )
+        if not exists:
+            db.add(ScheduleBlock(
+                date=block_date,
+                start_time=_parse_time(start_time),
+                end_time=_parse_time(end_time),
+                title=title,
+                category="self",
+                note="自動配置。必要なら編集してください。",
+            ))
+    db.commit()
+    return get_schedule_week(start, db)
 
 
 @router.get("/month", response_model=list[DayCell])

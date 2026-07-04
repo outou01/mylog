@@ -53,6 +53,34 @@ export interface PatternInsight {
   aria_comment: string;
 }
 
+export interface ScheduleBlock {
+  id: number | null;
+  date: string;
+  start_time: string;
+  end_time: string;
+  title: string;
+  category: "work" | "self" | "life" | "rest" | string;
+  note: string | null;
+  editable: boolean;
+}
+
+export interface WeekSchedule {
+  week_start: string;
+  week_end: string;
+  day_start_hour: number;
+  day_end_hour: number;
+  blocks: ScheduleBlock[];
+}
+
+export interface ScheduleBlockPayload {
+  date: string;
+  start_time: string;
+  end_time: string;
+  title: string;
+  category: string;
+  note: string | null;
+}
+
 export const fetchMonthCalendar = (year: number, month: number) =>
   api.get<DayCell[]>("/calendar/month", { params: { year, month } }).then((r) => r.data);
 
@@ -64,3 +92,18 @@ export const fetchWeeklyHours = () =>
 
 export const fetchPatterns = () =>
   api.get<PatternInsight>("/calendar/patterns").then((r) => r.data);
+
+export const fetchWeekSchedule = (week_start?: string) =>
+  api.get<WeekSchedule>("/calendar/schedule-week", { params: { week_start } }).then((r) => r.data);
+
+export const createScheduleBlock = (data: ScheduleBlockPayload) =>
+  api.post<ScheduleBlock>("/calendar/schedule-blocks", data).then((r) => r.data);
+
+export const updateScheduleBlock = (id: number, data: ScheduleBlockPayload) =>
+  api.patch<ScheduleBlock>(`/calendar/schedule-blocks/${id}`, data).then((r) => r.data);
+
+export const deleteScheduleBlock = (id: number) =>
+  api.delete(`/calendar/schedule-blocks/${id}`).then((r) => r.data);
+
+export const autoPlanWeek = (week_start?: string) =>
+  api.post<WeekSchedule>("/calendar/schedule-week/auto-plan", null, { params: { week_start } }).then((r) => r.data);

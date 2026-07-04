@@ -1,269 +1,352 @@
-import { useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  fetchMonthCalendar, fetchWeekCompare, fetchWeeklyHours, fetchPatterns,
-  DayCell, WeekCompare, WeekHoursCompare, PatternInsight,
+  autoPlanWeek,
+  createScheduleBlock,
+  deleteScheduleBlock,
+  fetchMonthCalendar,
+  fetchPatterns,
+  fetchWeekCompare,
+  fetchWeeklyHours,
+  fetchWeekSchedule,
+  PatternInsight,
+  ScheduleBlock,
+  ScheduleBlockPayload,
+  WeekCompare,
+  WeekHoursCompare,
+  WeekSchedule,
+  updateScheduleBlock,
 } from "../api/calendar";
 import "./Calendar.css";
 
 const WEEKDAYS = ["月", "火", "水", "木", "金", "土", "日"];
 const MOOD_COLOR: Record<number, string> = {
-  1: "#ef4444", 2: "#f97316", 3: "#6b7280", 4: "#60a5fa", 5: "#4ade80",
+  1: "#ef4444",
+  2: "#f97316",
+  3: "#6b7280",
+  4: "#60a5fa",
+  5: "#4ade80",
 };
-const ENERGY_LABEL: Record<number, string> = { 1: "疲", 2: "普", 3: "元" };
 
-const ACTIVITY_LABELS: { key: keyof WeekHoursCompare["this_week"]; label: string; color: string }[] = [
-  { key: "create_hours", label: "🎨 創作", color: "#a78bfa" },
-  { key: "workout_hours", label: "💪 筋トレ", color: "#4ade80" },
-  { key: "code_hours", label: "💻 開発", color: "#60a5fa" },
-  { key: "study_hours", label: "📚 勉強", color: "#fbbf24" },
-  { key: "job_search_hours", label: "💼 転職活動", color: "#f97316" },
-];
+type Tab = "schedule" | "month" | "hours" | "patterns";
 
-function localToday() {
-  const d = new Date();
+const emptyForm: ScheduleBlockPayload = {
+  date: "",
+  start_time: "20:30",
+  end_time: "21:00",
+  title: "自分の畑",
+  category: "self",
+  note: "",
+};
+
+function localDate(d = new Date()) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-function HoursBar({ thisVal, lastVal, label, color }: { thisVal: number; lastVal: number; label: string; color: string }) {
-  const max = Math.max(thisVal, lastVal, 1);
-  const diff = Math.round((thisVal - lastVal) * 10) / 10;
-  const improved = diff > 0;
-  return (
-    <div className="hours-bar-row">
-      <div className="hours-bar-label">{label}</div>
-      <div className="hours-bar-tracks">
-        <div className="hours-bar-track">
-          <div className="hours-bar-fill" style={{ width: `${(thisVal / max) * 100}%`, background: color }} />
-          <span className="hours-bar-val">{thisVal}h</span>
-        </div>
-        <div className="hours-bar-track last">
-          <div className="hours-bar-fill" style={{ width: `${(lastVal / max) * 100}%`, background: color, opacity: 0.35 }} />
-          <span className="hours-bar-val muted">{lastVal}h</span>
-        </div>
-      </div>
-      {diff !== 0 && (
-        <div className={`hours-diff-badge ${improved ? "improved" : "worsened"}`}>
-          {improved ? "+" : ""}{diff}h
-        </div>
-      )}
-    </div>
-  );
+function addDays(dateText: string, days: number) {
+  const d = new Date(`${dateText}T00:00:00`);
+  d.setDate(d.getDate() + days);
+  return localDate(d);
 }
 
-function StatDiff({ label, thisVal, lastVal, unit = "", higherIsBetter = true }: {
-  label: string; thisVal: number; lastVal: number; unit?: string; higherIsBetter?: boolean;
-}) {
-  const diff = Math.round((thisVal - lastVal) * 10) / 10;
-  const improved = higherIsBetter ? diff > 0 : diff < 0;
-  const sign = diff > 0 ? "+" : "";
-  return (
-    <div className="stat-diff">
-      <div className="stat-diff-label">{label}</div>
-      <div className="stat-diff-values">
-        <span className="stat-this">{thisVal}{unit}</span>
-        <span className="stat-last">先週: {lastVal}{unit}</span>
-      </div>
-      {diff !== 0 && (
-        <div className={`stat-diff-badge ${improved ? "improved" : "worsened"}`}>
-          {sign}{diff}{unit}
-        </div>
-      )}
-    </div>
-  );
+function mondayOf(dateText: string) {
+  const d = new Date(`${dateText}T00:00:00`);
+  const day = d.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  return localDate(d);
 }
 
-type Tab = "calendar" | "hours" | "patterns";
+function minutesOf(timeText: string) {
+  const [h, m] = timeText.split(":").map(Number);
+  return h * 60 + m;
+}
+
+function displayDate(dateText: string) {
+  const d = new Date(`${dateText}T00:00:00`);
+  return `${d.getMonth() + 1}/${d.getDate()}`;
+}
+
+function blockStyle(block: ScheduleBlock, schedule: WeekSchedule) {
+  const dayStart = schedule.day_start_hour * 60;
+  const total = (schedule.day_end_hour - schedule.day_start_hour) * 60;
+  const top = ((minutesOf(block.start_time) - dayStart) / total) * 100;
+  const height = ((minutesOf(block.end_time) - minutesOf(block.start_time)) / total) * 100;
+  return {
+    top: `${Math.max(0, top)}%`,
+    height: `${Math.max(4, height)}%`,
+  };
+}
+
+function toPayload(block: ScheduleBlock): ScheduleBlockPayload {
+  return {
+    date: block.date,
+    start_time: block.start_time,
+    end_time: block.end_time,
+    title: block.title,
+    category: block.category,
+    note: block.note ?? "",
+  };
+}
 
 export default function Calendar() {
   const navigate = useNavigate();
-  const today = localToday();
-  const todayDate = new Date(today);
+  const today = localDate();
+  const [tab, setTab] = useState<Tab>("schedule");
+  const [weekStart, setWeekStart] = useState(mondayOf(today));
+  const [schedule, setSchedule] = useState<WeekSchedule | null>(null);
+  const [form, setForm] = useState<ScheduleBlockPayload>({ ...emptyForm, date: today });
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [saving, setSaving] = useState(false);
 
-  const [tab, setTab] = useState<Tab>("calendar");
-  const [year, setYear] = useState(todayDate.getFullYear());
-  const [month, setMonth] = useState(todayDate.getMonth() + 1);
-  const [cells, setCells] = useState<DayCell[]>([]);
+  const [monthCells, setMonthCells] = useState<any[]>([]);
   const [compare, setCompare] = useState<WeekCompare | null>(null);
   const [hours, setHours] = useState<WeekHoursCompare | null>(null);
   const [patterns, setPatterns] = useState<PatternInsight | null>(null);
-  const [loadingHours, setLoadingHours] = useState(false);
-  const [loadingPatterns, setLoadingPatterns] = useState(false);
+
+  const weekDays = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
+
+  const loadSchedule = async () => {
+    const data = await fetchWeekSchedule(weekStart);
+    setSchedule(data);
+  };
 
   useEffect(() => {
-    fetchMonthCalendar(year, month).then(setCells);
-  }, [year, month]);
+    loadSchedule();
+  }, [weekStart]);
 
   useEffect(() => {
-    fetchWeekCompare().then(setCompare);
-  }, []);
-
-  useEffect(() => {
-    if (tab === "hours" && !hours) {
-      setLoadingHours(true);
-      fetchWeeklyHours().then(setHours).finally(() => setLoadingHours(false));
+    if (tab === "month") {
+      const d = new Date(`${today}T00:00:00`);
+      fetchMonthCalendar(d.getFullYear(), d.getMonth() + 1).then(setMonthCells);
+      fetchWeekCompare().then(setCompare);
     }
-    if (tab === "patterns" && !patterns) {
-      setLoadingPatterns(true);
-      fetchPatterns().then(setPatterns).finally(() => setLoadingPatterns(false));
+    if (tab === "hours" && !hours) fetchWeeklyHours().then(setHours);
+    if (tab === "patterns" && !patterns) fetchPatterns().then(setPatterns);
+  }, [tab]);
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    setSaving(true);
+    try {
+      const payload = { ...form, note: form.note || null };
+      if (editingId) {
+        await updateScheduleBlock(editingId, payload);
+      } else {
+        await createScheduleBlock(payload);
+      }
+      setEditingId(null);
+      setForm({ ...emptyForm, date: payload.date });
+      await loadSchedule();
+    } finally {
+      setSaving(false);
     }
-  }, [tab, hours, patterns]);
+  };
 
-  const prevMonth = () => { if (month === 1) { setYear(y => y - 1); setMonth(12); } else setMonth(m => m - 1); };
-  const nextMonth = () => { if (month === 12) { setYear(y => y + 1); setMonth(1); } else setMonth(m => m + 1); };
+  const startEdit = (block: ScheduleBlock) => {
+    if (!block.editable || block.id == null) return;
+    setEditingId(block.id);
+    setForm(toPayload(block));
+  };
 
-  const firstDayOfWeek = new Date(year, month - 1, 1).getDay();
-  const offset = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1;
-  const blanks = Array(offset).fill(null);
+  const remove = async () => {
+    if (!editingId) return;
+    setSaving(true);
+    try {
+      await deleteScheduleBlock(editingId);
+      setEditingId(null);
+      setForm({ ...emptyForm, date: today });
+      await loadSchedule();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const quickToday = async () => {
+    setSaving(true);
+    try {
+      await createScheduleBlock({
+        date: today,
+        start_time: "20:30",
+        end_time: "21:00",
+        title: "今日の畑 30分",
+        category: "self",
+        note: "ログ入力が面倒な日でも、ここだけ見れば戻れる枠。",
+      });
+      await loadSchedule();
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="calendar-page">
-
-      {/* タブ */}
       <div className="cal-tabs">
-        <button className={`cal-tab ${tab === "calendar" ? "active" : ""}`} onClick={() => setTab("calendar")}>📅 カレンダー</button>
-        <button className={`cal-tab ${tab === "hours" ? "active" : ""}`} onClick={() => setTab("hours")}>⏱ 時間グラフ</button>
-        <button className={`cal-tab ${tab === "patterns" ? "active" : ""}`} onClick={() => setTab("patterns")}>🔍 パターン分析</button>
+        <button className={`cal-tab ${tab === "schedule" ? "active" : ""}`} onClick={() => setTab("schedule")}>週予定</button>
+        <button className={`cal-tab ${tab === "month" ? "active" : ""}`} onClick={() => setTab("month")}>月ログ</button>
+        <button className={`cal-tab ${tab === "hours" ? "active" : ""}`} onClick={() => setTab("hours")}>時間</button>
+        <button className={`cal-tab ${tab === "patterns" ? "active" : ""}`} onClick={() => setTab("patterns")}>分析</button>
       </div>
 
-      {/* カレンダータブ */}
-      {tab === "calendar" && (
+      {tab === "schedule" && schedule && (
         <>
-          <div className="card cal-card">
-            <div className="cal-header">
-              <button className="cal-nav-btn" onClick={prevMonth}>‹</button>
-              <h2 className="cal-title">{year}年 {month}月</h2>
-              <button className="cal-nav-btn" onClick={nextMonth}>›</button>
+          <section className="card schedule-console">
+            <div className="schedule-head">
+              <button className="cal-nav-btn" onClick={() => setWeekStart(addDays(weekStart, -7))}>‹</button>
+              <div>
+                <p className="schedule-kicker">月曜始まり</p>
+                <h2>{displayDate(schedule.week_start)} - {displayDate(schedule.week_end)}</h2>
+              </div>
+              <button className="cal-nav-btn" onClick={() => setWeekStart(addDays(weekStart, 7))}>›</button>
             </div>
+
+            <div className="schedule-actions">
+              <button className="schedule-btn primary" onClick={() => autoPlanWeek(weekStart).then(setSchedule)} disabled={saving}>
+                今週の畑枠を自動配置
+              </button>
+              <button className="schedule-btn" onClick={quickToday} disabled={saving}>今日30分だけ入れる</button>
+            </div>
+
+            <p className="schedule-note">
+              平日9:30-18:30は自動で仕事として表示します。編集するのは、それ以外に置く「自分の畑」だけで大丈夫です。
+            </p>
+          </section>
+
+          <section className="schedule-layout">
+            <div className="card week-board">
+              <div className="week-grid">
+                <div className="time-col">
+                  {Array.from({ length: schedule.day_end_hour - schedule.day_start_hour + 1 }, (_, i) => (
+                    <span key={i}>{schedule.day_start_hour + i}:00</span>
+                  ))}
+                </div>
+                {weekDays.map((day, index) => {
+                  const dayBlocks = schedule.blocks.filter((block) => block.date === day);
+                  return (
+                    <div className="day-col" key={day}>
+                      <div className={`day-head ${day === today ? "today" : ""}`}>
+                        <span>{WEEKDAYS[index]}</span>
+                        <strong>{displayDate(day)}</strong>
+                      </div>
+                      <div className="day-lane">
+                        {dayBlocks.map((block, blockIndex) => (
+                          <button
+                            key={`${block.id ?? "work"}-${block.date}-${block.start_time}-${blockIndex}`}
+                            className={`schedule-block ${block.category} ${block.editable ? "editable" : ""}`}
+                            style={blockStyle(block, schedule)}
+                            onClick={() => startEdit(block)}
+                          >
+                            <span>{block.start_time}-{block.end_time}</span>
+                            <strong>{block.title}</strong>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <form className="card schedule-form" onSubmit={submit}>
+              <p className="schedule-kicker">{editingId ? "予定を編集" : "予定を追加"}</p>
+              <label>
+                日付
+                <input type="date" value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value })} />
+              </label>
+              <div className="form-pair">
+                <label>
+                  開始
+                  <input type="time" value={form.start_time} onChange={(event) => setForm({ ...form, start_time: event.target.value })} />
+                </label>
+                <label>
+                  終了
+                  <input type="time" value={form.end_time} onChange={(event) => setForm({ ...form, end_time: event.target.value })} />
+                </label>
+              </div>
+              <label>
+                タイトル
+                <input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} />
+              </label>
+              <label>
+                種類
+                <select value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })}>
+                  <option value="self">自分の畑</option>
+                  <option value="life">生活</option>
+                  <option value="rest">休憩</option>
+                </select>
+              </label>
+              <label>
+                メモ
+                <textarea rows={3} value={form.note ?? ""} onChange={(event) => setForm({ ...form, note: event.target.value })} />
+              </label>
+              <div className="form-actions">
+                <button className="schedule-btn primary" disabled={saving}>{editingId ? "保存" : "追加"}</button>
+                {editingId && <button type="button" className="schedule-btn danger" onClick={remove} disabled={saving}>削除</button>}
+                {editingId && <button type="button" className="schedule-btn" onClick={() => setEditingId(null)}>解除</button>}
+              </div>
+            </form>
+          </section>
+        </>
+      )}
+
+      {tab === "month" && (
+        <>
+          <section className="card cal-card">
+            <h2 className="plain-title">月ログ</h2>
             <div className="cal-grid-header">
-              {WEEKDAYS.map((d, i) => (
-                <div key={d} className={`cal-wday ${i >= 5 ? "weekend" : ""}`}>{d}</div>
-              ))}
+              {WEEKDAYS.map((d, i) => <div key={d} className={`cal-wday ${i >= 5 ? "weekend" : ""}`}>{d}</div>)}
             </div>
             <div className="cal-grid">
-              {blanks.map((_, i) => <div key={`b${i}`} className="cal-cell empty" />)}
-              {cells.map((cell) => {
-                const d = new Date(cell.date);
-                const dayNum = d.getDate();
-                const dow = d.getDay();
-                const isToday = cell.date === today;
-                const isWeekend = dow === 0 || dow === 6;
+              {monthCells.map((cell) => {
+                const d = new Date(`${cell.date}T00:00:00`);
                 const moodColor = cell.mood_score ? MOOD_COLOR[cell.mood_score] : undefined;
                 return (
-                  <div key={cell.date}
-                    className={`cal-cell ${cell.has_log ? "has-log" : ""} ${isToday ? "today" : ""} ${isWeekend ? "weekend" : ""}`}
+                  <button
+                    key={cell.date}
+                    className={`cal-cell ${cell.has_log ? "has-log" : ""} ${cell.date === today ? "today" : ""}`}
                     style={moodColor && cell.has_log ? { borderColor: moodColor } : undefined}
-                    onClick={() => cell.has_log ? navigate("/logs") : navigate("/log")}>
-                    <div className="cal-day-num">{dayNum}</div>
-                    {cell.has_log && (
-                      <>
-                        <div className="cal-mood-dot" style={{ background: moodColor }} />
-                        {cell.energy_level && <div className={`cal-energy energy-${cell.energy_level}`}>{ENERGY_LABEL[cell.energy_level]}</div>}
-                        <div className="cal-flags">
-                          {cell.did_workout && <span>💪</span>}
-                          {cell.did_create && <span>🎨</span>}
-                          {cell.victory_achieved && <span>🎯</span>}
-                        </div>
-                        {cell.sleep_hours != null && <div className="cal-sleep">{cell.sleep_hours}h</div>}
-                      </>
-                    )}
-                  </div>
+                    onClick={() => cell.has_log ? navigate("/logs") : navigate("/log")}
+                  >
+                    <span className="cal-day-num">{d.getDate()}</span>
+                    {cell.has_log && <span className="cal-sleep">{cell.sleep_hours}h</span>}
+                  </button>
                 );
               })}
             </div>
-            <div className="cal-legend">
-              {[5, 4, 3, 2, 1].map(n => (
-                <div key={n} className="legend-item">
-                  <span className="legend-dot" style={{ background: MOOD_COLOR[n] }} />気分{n}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* 今週vs先週サマリー */}
+          </section>
           {compare && (
-            <div className="card compare-card">
-              <div className="compare-title">📊 今週 vs 先週</div>
-              <div className="aria-compare-bubble">
-                <span className="aria-mini-face">(＾ω＾) アリア</span>
-                <p>{compare.aria_comment}</p>
-              </div>
-              <div className="compare-grid">
-                <StatDiff label="平均睡眠" thisVal={compare.this_week.avg_sleep} lastVal={compare.last_week.avg_sleep} unit="h" />
-                <StatDiff label="平均気分" thisVal={compare.this_week.avg_mood} lastVal={compare.last_week.avg_mood} unit="/5" />
-                <StatDiff label="筋トレ" thisVal={compare.this_week.workout_days} lastVal={compare.last_week.workout_days} unit="日" />
-                <StatDiff label="創作" thisVal={compare.this_week.create_days} lastVal={compare.last_week.create_days} unit="日" />
-                <StatDiff label="回復活動" thisVal={compare.this_week.recovery_days} lastVal={compare.last_week.recovery_days} unit="日" />
-                <StatDiff label="飲酒" thisVal={compare.this_week.alcohol_days} lastVal={compare.last_week.alcohol_days} unit="日" higherIsBetter={false} />
-              </div>
-            </div>
+            <section className="card compare-card">
+              <h2 className="plain-title">今週 vs 先週</h2>
+              <div className="aria-compare-bubble">{compare.aria_comment}</div>
+            </section>
           )}
         </>
       )}
 
-      {/* 時間グラフタブ */}
       {tab === "hours" && (
-        <div className="card hours-card">
-          <div className="hours-title">⏱ 活動時間（今週 vs 先週）</div>
-          {loadingHours ? (
-            <div className="loading">集計中...</div>
-          ) : hours ? (
-            <>
-              <div className="hours-total-row">
-                <div className="hours-total-item">
-                  <div className="hours-total-val">{hours.this_week.total_advance_hours}h</div>
-                  <div className="hours-total-label">今週合計</div>
-                </div>
-                <div className="hours-total-arrow">vs</div>
-                <div className="hours-total-item muted">
-                  <div className="hours-total-val">{hours.last_week.total_advance_hours}h</div>
-                  <div className="hours-total-label">先週合計</div>
-                </div>
-                {hours.this_week.total_advance_hours !== hours.last_week.total_advance_hours && (
-                  <div className={`hours-total-diff ${hours.this_week.total_advance_hours > hours.last_week.total_advance_hours ? "improved" : "worsened"}`}>
-                    {hours.this_week.total_advance_hours > hours.last_week.total_advance_hours ? "+" : ""}
-                    {Math.round((hours.this_week.total_advance_hours - hours.last_week.total_advance_hours) * 10) / 10}h
-                  </div>
-                )}
+        <section className="card hours-card">
+          <h2 className="plain-title">自分の時間</h2>
+          {hours ? (
+            <div className="hours-total-row">
+              <div>
+                <div className="hours-total-val">{hours.this_week.total_advance_hours}h</div>
+                <div className="hours-total-label">今週</div>
               </div>
-
-              <div className="hours-legend">
-                <span className="hours-legend-item"><span className="hours-dot full" />今週</span>
-                <span className="hours-legend-item"><span className="hours-dot muted" />先週</span>
+              <div>
+                <div className="hours-total-val muted">{hours.last_week.total_advance_hours}h</div>
+                <div className="hours-total-label">先週</div>
               </div>
-
-              <div className="hours-bars">
-                {ACTIVITY_LABELS.map(({ key, label, color }) => (
-                  <HoursBar
-                    key={key}
-                    label={label}
-                    thisVal={hours.this_week[key] as number}
-                    lastVal={hours.last_week[key] as number}
-                    color={color}
-                  />
-                ))}
-              </div>
-
-              <div className="hours-week-range">
-                今週: {hours.week_start} 〜 ／ 先週: {hours.last_week_start} 〜
-              </div>
-            </>
-          ) : <p className="no-data">データがありません</p>}
-        </div>
+            </div>
+          ) : <p className="no-data">読み込み中...</p>}
+        </section>
       )}
 
-      {/* パターン分析タブ */}
       {tab === "patterns" && (
-        <div className="card patterns-card">
-          <div className="patterns-title">🔍 あなたの人生パターン分析</div>
-          {loadingPatterns ? (
-            <div className="loading">アリアが分析中...</div>
-          ) : patterns ? (
+        <section className="card patterns-card">
+          <h2 className="plain-title">パターン分析</h2>
+          {patterns ? (
             <>
-              <div className="aria-compare-bubble">
-                <span className="aria-mini-face">(＾ω＾) アリア</span>
-                <p>{patterns.aria_comment}</p>
-              </div>
+              <div className="aria-compare-bubble">{patterns.aria_comment}</div>
               <div className="patterns-list">
                 {patterns.insights.map((insight, i) => (
                   <div key={i} className="pattern-item">
@@ -272,12 +355,10 @@ export default function Calendar() {
                   </div>
                 ))}
               </div>
-              <div className="patterns-note">※ 過去30日のデータに基づく分析です</div>
             </>
-          ) : <p className="no-data">データがありません</p>}
-        </div>
+          ) : <p className="no-data">読み込み中...</p>}
+        </section>
       )}
-
     </div>
   );
 }
