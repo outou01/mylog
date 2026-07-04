@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import DailyLog, ScheduleBlock, ScheduleMessage
+from app.models import DailyLog, ScheduleBlock, ScheduleMessage, TimeAnalysisComment
 
 router = APIRouter(prefix="/calendar", tags=["calendar"])
 
@@ -73,6 +73,8 @@ class TimeAnalysisSection(BaseModel):
     label: str
     start_date: str
     end_date: str
+    scale_minutes: int
+    scale_label: str
     total_minutes: int
     categories: list[TimeCategoryTotal]
 
@@ -82,6 +84,19 @@ class TimeAnalysisOut(BaseModel):
     daily: TimeAnalysisSection
     weekly: TimeAnalysisSection
     monthly: TimeAnalysisSection
+
+
+class TimeAnalysisCommentPayload(BaseModel):
+    target_date: date | None = None
+    scope: str = Field(pattern="^(daily|weekly|monthly)$")
+
+
+class TimeAnalysisCommentOut(BaseModel):
+    scope: str
+    start_date: str
+    end_date: str
+    comment: str
+    is_fallback: bool
 
 
 class ScheduleBlockOut(BaseModel):
@@ -146,6 +161,12 @@ TIME_CATEGORIES = [
     {"key": "job_search", "label": "転職活動", "color": "#5d9cec"},
     {"key": "social", "label": "交流", "color": "#58b77b"},
 ]
+
+TIME_ANALYSIS_SCALES = {
+    "daily": {"minutes": 8 * 60, "label": "8h"},
+    "weekly": {"minutes": 40 * 60, "label": "40h"},
+    "monthly": {"minutes": 100 * 60, "label": "100h"},
+}
 
 
 def _work_blocks(start: date) -> list[ScheduleBlockOut]:
@@ -249,7 +270,7 @@ def _schedule_out(block: ScheduleBlock) -> ScheduleBlockOut:
     )
 
 
-def _time_analysis_section(label: str, start: date, end: date, db: Session) -> TimeAnalysisSection:
+def _time_analysis_section(scope: str, label: str, start: date, end: date, db: Session) -> TimeAnalysisSection:
     totals = {category["key"]: 0 for category in TIME_CATEGORIES}
     blocks = (
         db.query(ScheduleBlock)
@@ -277,8 +298,137 @@ def _time_analysis_section(label: str, start: date, end: date, db: Session) -> T
         label=label,
         start_date=start.isoformat(),
         end_date=end.isoformat(),
+        scale_minutes=TIME_ANALYSIS_SCALES[scope]["minutes"],
+        scale_label=TIME_ANALYSIS_SCALES[scope]["label"],
         total_minutes=sum(totals.values()),
         categories=categories,
+    )
+
+
+def _time_range_for_scope(scope: str, selected: date) -> tuple[date, date]:
+    from calendar import monthrange
+
+    if scope == "daily":
+        return selected, selected
+    if scope == "weekly":
+        start = _week_start(selected)
+        return start, start + timedelta(days=6)
+    month_start = selected.replace(day=1)
+    month_end = selected.replace(day=monthrange(selected.year, selected.month)[1])
+    return month_start, month_end
+
+
+def _fallback_time_analysis_comment(scope: str, section: TimeAnalysisSection) -> str:
+    top = max(section.categories, key=lambda category: category.minutes)
+    total_hours = round(section.total_minutes / 60, 1)
+    if section.total_minutes == 0:
+        return "まだ畑の時間は記録されていません。今日は30分だけでも、自分の時間を見える場所に置きましょう。 ※自動生成"
+    scope_label = {"daily": "今日", "weekly": "今週", "monthly": "今月"}[scope]
+    return f"{scope_label}は合計{total_hours}時間、自分の畑を耕しています。特に{top.label}が育っていますね。 ※自動生成"
+
+
+def _generate_time_analysis_comment(scope: str, section: TimeAnalysisSection) -> tuple[str, bool]:
+    from app.ai_client import chat
+
+    scope_label = {"daily": "日次", "weekly": "週次", "monthly": "月次"}[scope]
+    category_lines = "\n".join(
+        f"- {category.label}: {category.hours:.1f}h"
+        for category in section.categories
+    )
+    prompt = f"""
+あなたはライフダッシュボードのナビゲーター「アリア」です。
+ユーザーの私生活の時間実績を見て、モチベーションが上がる短い感想を日本語で返してください。
+
+対象: {scope_label}（{section.label}）
+合計: {section.total_minutes / 60:.1f}h
+カテゴリ:
+{category_lines}
+
+条件:
+- 2文以内
+- 説教しない
+- 仕事以外の時間を育てている実感が出る
+- 数値を1つ以上入れる
+- 引用符や箇条書きは不要
+"""
+    executor = ThreadPoolExecutor(max_workers=1)
+    future = executor.submit(chat, prompt, 0.8)
+    try:
+        raw = future.result(timeout=4.5)
+    except TimeoutError:
+        future.cancel()
+        executor.shutdown(wait=False, cancel_futures=True)
+        raw = None
+    except Exception:
+        raw = None
+    finally:
+        if future.done():
+            executor.shutdown(wait=False, cancel_futures=True)
+
+    if not raw:
+        return _fallback_time_analysis_comment(scope, section), True
+    return raw.strip().replace("\n", " ")[:180], False
+
+
+@router.post("/time-analysis/comment", response_model=TimeAnalysisCommentOut)
+def create_time_analysis_comment(payload: TimeAnalysisCommentPayload, db: Session = Depends(get_db)):
+    selected = payload.target_date or date.today()
+    start, end = _time_range_for_scope(payload.scope, selected)
+    stored = (
+        db.query(TimeAnalysisComment)
+        .filter(
+            TimeAnalysisComment.scope == payload.scope,
+            TimeAnalysisComment.start_date == start,
+            TimeAnalysisComment.end_date == end,
+        )
+        .first()
+    )
+    if stored and not stored.is_fallback:
+        return TimeAnalysisCommentOut(
+            scope=stored.scope,
+            start_date=stored.start_date.isoformat(),
+            end_date=stored.end_date.isoformat(),
+            comment=stored.comment,
+            is_fallback=stored.is_fallback,
+        )
+    if stored and stored.updated_at:
+        elapsed = (datetime.now() - stored.updated_at).total_seconds()
+        if elapsed < 30 * 60:
+            return TimeAnalysisCommentOut(
+                scope=stored.scope,
+                start_date=stored.start_date.isoformat(),
+                end_date=stored.end_date.isoformat(),
+                comment=stored.comment,
+                is_fallback=stored.is_fallback,
+            )
+
+    if payload.scope == "daily":
+        label = start.strftime("%Y/%m/%d")
+    elif payload.scope == "weekly":
+        label = f"{start.strftime('%Y/%m/%d')}〜{end.strftime('%m/%d')}"
+    else:
+        label = start.strftime("%Y/%m")
+    section = _time_analysis_section(payload.scope, label, start, end, db)
+    comment, is_fallback = _generate_time_analysis_comment(payload.scope, section)
+    if stored:
+        stored.comment = comment
+        stored.is_fallback = is_fallback
+    else:
+        stored = TimeAnalysisComment(
+            scope=payload.scope,
+            start_date=start,
+            end_date=end,
+            comment=comment,
+            is_fallback=is_fallback,
+        )
+        db.add(stored)
+    db.commit()
+    return TimeAnalysisCommentOut(
+        scope=payload.scope,
+        start_date=start.isoformat(),
+        end_date=end.isoformat(),
+        comment=comment,
+        is_fallback=is_fallback,
     )
 
 
@@ -294,18 +444,21 @@ def get_time_analysis(target_date: date | None = None, db: Session = Depends(get
     return TimeAnalysisOut(
         selected_date=selected.isoformat(),
         daily=_time_analysis_section(
+            "daily",
             selected.strftime("%Y/%m/%d"),
             selected,
             selected,
             db,
         ),
         weekly=_time_analysis_section(
+            "weekly",
             f"{week_start.strftime('%Y/%m/%d')}〜{(week_start + timedelta(days=6)).strftime('%m/%d')}",
             week_start,
             week_start + timedelta(days=6),
             db,
         ),
         monthly=_time_analysis_section(
+            "monthly",
             selected.strftime("%Y/%m"),
             month_start,
             month_end,

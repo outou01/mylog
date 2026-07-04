@@ -1,22 +1,36 @@
 import { useEffect, useMemo, useState } from "react";
-import { fetchTimeAnalysis, TimeAnalysis as TimeAnalysisData, TimeAnalysisSection } from "../api/calendar";
+import {
+  createTimeAnalysisComment,
+  fetchTimeAnalysis,
+  TimeAnalysis as TimeAnalysisData,
+  TimeAnalysisComment,
+  TimeAnalysisSection,
+} from "../api/calendar";
 import "./TimeAnalysis.css";
 
 function localDate(d = new Date()) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-function sectionMax(section: TimeAnalysisSection) {
-  return Math.max(60, ...section.categories.map((category) => category.minutes));
-}
-
 function totalHours(minutes: number) {
   return (minutes / 60).toFixed(1);
 }
 
-function AnalysisSection({ title, section }: { title: string; section: TimeAnalysisSection }) {
-  const maxMinutes = sectionMax(section);
-
+function AnalysisSection({
+  title,
+  scope,
+  section,
+  comment,
+  requesting,
+  onRequestComment,
+}: {
+  title: string;
+  scope: TimeAnalysisComment["scope"];
+  section: TimeAnalysisSection;
+  comment: TimeAnalysisComment | undefined;
+  requesting: boolean;
+  onRequestComment: (scope: TimeAnalysisComment["scope"]) => void;
+}) {
   return (
     <section className="analysis-card">
       <div className="analysis-section-head">
@@ -29,7 +43,8 @@ function AnalysisSection({ title, section }: { title: string; section: TimeAnaly
 
       <div className="bar-list">
         {section.categories.map((category) => {
-          const width = Math.max(2, (category.minutes / maxMinutes) * 100);
+          const rawWidth = (category.minutes / section.scale_minutes) * 100;
+          const width = category.minutes === 0 ? 0 : Math.max(1, Math.min(100, rawWidth));
           return (
             <div className="bar-row" key={category.key}>
               <div className="bar-name">
@@ -50,6 +65,18 @@ function AnalysisSection({ title, section }: { title: string; section: TimeAnaly
           );
         })}
       </div>
+
+      <div className="scale-note">
+        <span>0h</span>
+        <span>右端 {section.scale_label}</span>
+      </div>
+
+      <div className="aria-analysis">
+        {comment ? <p>{comment.comment}</p> : <p className="muted">アリアの感想は必要な時だけ呼び出せます。</p>}
+        <button className="aria-comment-btn" type="button" onClick={() => onRequestComment(scope)} disabled={requesting}>
+          {requesting ? "アリア確認中..." : "アリアに感想をもらう"}
+        </button>
+      </div>
     </section>
   );
 }
@@ -58,14 +85,27 @@ export default function TimeAnalysis() {
   const today = useMemo(() => localDate(), []);
   const [targetDate, setTargetDate] = useState(today);
   const [analysis, setAnalysis] = useState<TimeAnalysisData | null>(null);
+  const [comments, setComments] = useState<Partial<Record<TimeAnalysisComment["scope"], TimeAnalysisComment>>>({});
+  const [requestingScope, setRequestingScope] = useState<TimeAnalysisComment["scope"] | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     setLoading(true);
+    setComments({});
     fetchTimeAnalysis(targetDate)
       .then(setAnalysis)
       .finally(() => setLoading(false));
   }, [targetDate]);
+
+  const requestComment = async (scope: TimeAnalysisComment["scope"]) => {
+    setRequestingScope(scope);
+    try {
+      const comment = await createTimeAnalysisComment(scope, targetDate);
+      setComments((current) => ({ ...current, [scope]: comment }));
+    } finally {
+      setRequestingScope(null);
+    }
+  };
 
   return (
     <div className="time-analysis-page">
@@ -84,9 +124,30 @@ export default function TimeAnalysis() {
 
       {analysis && (
         <div className="analysis-stack">
-          <AnalysisSection title="日次" section={analysis.daily} />
-          <AnalysisSection title="週次" section={analysis.weekly} />
-          <AnalysisSection title="月次" section={analysis.monthly} />
+          <AnalysisSection
+            title="日次"
+            scope="daily"
+            section={analysis.daily}
+            comment={comments.daily}
+            requesting={requestingScope === "daily"}
+            onRequestComment={requestComment}
+          />
+          <AnalysisSection
+            title="週次"
+            scope="weekly"
+            section={analysis.weekly}
+            comment={comments.weekly}
+            requesting={requestingScope === "weekly"}
+            onRequestComment={requestComment}
+          />
+          <AnalysisSection
+            title="月次"
+            scope="monthly"
+            section={analysis.monthly}
+            comment={comments.monthly}
+            requesting={requestingScope === "monthly"}
+            onRequestComment={requestComment}
+          />
         </div>
       )}
     </div>

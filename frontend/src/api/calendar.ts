@@ -94,6 +94,8 @@ export interface TimeAnalysisSection {
   label: string;
   start_date: string;
   end_date: string;
+  scale_minutes: number;
+  scale_label: string;
   total_minutes: number;
   categories: TimeCategoryTotal[];
 }
@@ -103,6 +105,14 @@ export interface TimeAnalysis {
   daily: TimeAnalysisSection;
   weekly: TimeAnalysisSection;
   monthly: TimeAnalysisSection;
+}
+
+export interface TimeAnalysisComment {
+  scope: "daily" | "weekly" | "monthly";
+  start_date: string;
+  end_date: string;
+  comment: string;
+  is_fallback: boolean;
 }
 
 export const fetchMonthCalendar = (year: number, month: number) =>
@@ -122,6 +132,9 @@ export const fetchWeekSchedule = (week_start?: string) =>
 
 export const fetchTimeAnalysis = (target_date?: string) =>
   api.get<TimeAnalysis>("/calendar/time-analysis", { params: { target_date } }).then((r) => r.data);
+
+export const createTimeAnalysisComment = (scope: TimeAnalysisComment["scope"], target_date?: string) =>
+  api.post<TimeAnalysisComment>("/calendar/time-analysis/comment", { scope, target_date }).then((r) => r.data);
 
 export const createScheduleBlock = (data: ScheduleBlockPayload) =>
   api.post<ScheduleBlock>("/calendar/schedule-blocks", data).then((r) => r.data);
