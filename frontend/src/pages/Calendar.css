@@ -2,7 +2,7 @@
   display: flex;
   flex-direction: column;
   gap: 1rem;
-  max-width: 1120px;
+  max-width: 1280px;
   margin: 0 auto;
 }
 
@@ -104,10 +104,7 @@
 }
 
 .schedule-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 300px;
-  gap: 1rem;
-  align-items: start;
+  display: block;
 }
 
 .week-board {
@@ -116,8 +113,8 @@
 
 .week-grid {
   display: grid;
-  grid-template-columns: 52px repeat(7, minmax(112px, 1fr));
-  min-width: 900px;
+  grid-template-columns: 52px repeat(7, minmax(132px, 1fr));
+  min-width: 1040px;
   min-height: 760px;
 }
 
@@ -253,9 +250,29 @@
 
 .schedule-form {
   display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 0.75rem;
-  position: sticky;
-  top: 78px;
+  align-items: end;
+}
+
+.schedule-form .schedule-kicker {
+  grid-column: 1 / -1;
+}
+
+.schedule-form > label {
+  grid-column: span 2;
+}
+
+.schedule-form .memo-field {
+  grid-column: span 3;
+}
+
+.schedule-form .form-pair {
+  grid-column: span 2;
+}
+
+.schedule-form .form-actions {
+  grid-column: span 3;
 }
 
 .schedule-form label {
@@ -402,16 +419,19 @@
 }
 
 @media (max-width: 840px) {
-  .schedule-layout {
-    grid-template-columns: 1fr;
-  }
-
   .schedule-actions {
     grid-template-columns: 1fr;
   }
 
   .schedule-form {
-    position: static;
+    grid-template-columns: 1fr;
+  }
+
+  .schedule-form > label,
+  .schedule-form .memo-field,
+  .schedule-form .form-pair,
+  .schedule-form .form-actions {
+    grid-column: 1;
   }
 }
 

@@ -5,11 +5,9 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import DailyLog, ScheduleBlock
+from app.models import DailyLog, ScheduleBlock, ScheduleMessage
 
 router = APIRouter(prefix="/calendar", tags=["calendar"])
-
-_schedule_message_cache: dict[str, str] = {}
 
 
 class DayCell(BaseModel):
@@ -141,12 +139,8 @@ def _fallback_schedule_message(today: date) -> str:
     return messages[today.toordinal() % len(messages)]
 
 
-def _schedule_message(today: date) -> str:
+def _generate_schedule_message(today: date) -> tuple[str, bool]:
     from app.ai_client import chat
-
-    cache_key = today.isoformat()
-    if cache_key in _schedule_message_cache:
-        return _schedule_message_cache[cache_key]
 
     prompt = """
 あなたはライフダッシュボードのナビゲーター「アリア」です。
@@ -160,7 +154,7 @@ def _schedule_message(today: date) -> str:
     executor = ThreadPoolExecutor(max_workers=1)
     future = executor.submit(chat, prompt, 0.9)
     try:
-        raw = future.result(timeout=1.8)
+        raw = future.result(timeout=4.5)
     except TimeoutError:
         future.cancel()
         executor.shutdown(wait=False, cancel_futures=True)
@@ -172,9 +166,33 @@ def _schedule_message(today: date) -> str:
             executor.shutdown(wait=False, cancel_futures=True)
     if not raw:
         message = f"{_fallback_schedule_message(today)} ※自動生成"
+        is_fallback = True
     else:
         message = raw.strip().replace("\n", " ")[:120]
-    _schedule_message_cache[cache_key] = message
+        is_fallback = False
+    return message, is_fallback
+
+
+def _schedule_message(today: date, db: Session) -> str:
+    stored = db.query(ScheduleMessage).filter(ScheduleMessage.message_date == today).first()
+    if stored and not stored.is_fallback:
+        return stored.message
+
+    message, is_fallback = _generate_schedule_message(today)
+    if stored:
+        if not is_fallback:
+            stored.message = message
+            stored.is_fallback = False
+            db.commit()
+        return stored.message if stored.is_fallback else message
+
+    stored = ScheduleMessage(
+        message_date=today,
+        message=message,
+        is_fallback=is_fallback,
+    )
+    db.add(stored)
+    db.commit()
     return message
 
 
@@ -207,7 +225,7 @@ def get_schedule_week(week_start: date | None = None, db: Session = Depends(get_
         week_end=end.isoformat(),
         day_start_hour=6,
         day_end_hour=24,
-        schedule_message=_schedule_message(today),
+        schedule_message=_schedule_message(today, db),
         blocks=_work_blocks(start) + [_schedule_out(block) for block in blocks],
     )
 

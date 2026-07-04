@@ -322,46 +322,46 @@ export default function Calendar() {
                 })}
               </div>
             </div>
-
-            <form className="card schedule-form" onSubmit={submit}>
-              <p className="schedule-kicker">{editingId ? "予定を編集" : "予定を追加"}</p>
-              <label>
-                日付
-                <input type="date" value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value })} />
-              </label>
-              <div className="form-pair">
-                <label>
-                  開始
-                  <input type="time" value={form.start_time} onChange={(event) => setForm({ ...form, start_time: event.target.value })} />
-                </label>
-                <label>
-                  終了
-                  <input type="time" value={form.end_time} onChange={(event) => setForm({ ...form, end_time: event.target.value })} />
-                </label>
-              </div>
-              <label>
-                タイトル
-                <input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} />
-              </label>
-              <label>
-                種類
-                <select value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })}>
-                  {SCHEDULE_CATEGORIES.map((category) => (
-                    <option value={category.key} key={category.key}>{category.label}</option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                メモ
-                <textarea rows={3} value={form.note ?? ""} onChange={(event) => setForm({ ...form, note: event.target.value })} />
-              </label>
-              <div className="form-actions">
-                <button className="schedule-btn primary" disabled={saving}>{editingId ? "保存" : "追加"}</button>
-                {editingId && <button type="button" className="schedule-btn danger" onClick={remove} disabled={saving}>削除</button>}
-                {editingId && <button type="button" className="schedule-btn" onClick={() => setEditingId(null)}>解除</button>}
-              </div>
-            </form>
           </section>
+
+          <form className="card schedule-form" onSubmit={submit}>
+            <p className="schedule-kicker">{editingId ? "予定を編集" : "予定を追加"}</p>
+            <label>
+              日付
+              <input type="date" value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value })} />
+            </label>
+            <div className="form-pair">
+              <label>
+                開始
+                <input type="time" value={form.start_time} onChange={(event) => setForm({ ...form, start_time: event.target.value })} />
+              </label>
+              <label>
+                終了
+                <input type="time" value={form.end_time} onChange={(event) => setForm({ ...form, end_time: event.target.value })} />
+              </label>
+            </div>
+            <label>
+              タイトル
+              <input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} />
+            </label>
+            <label>
+              種類
+              <select value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })}>
+                {SCHEDULE_CATEGORIES.map((category) => (
+                  <option value={category.key} key={category.key}>{category.label}</option>
+                ))}
+              </select>
+            </label>
+            <label className="memo-field">
+              メモ
+              <textarea rows={3} value={form.note ?? ""} onChange={(event) => setForm({ ...form, note: event.target.value })} />
+            </label>
+            <div className="form-actions">
+              <button className="schedule-btn primary" disabled={saving}>{editingId ? "保存" : "追加"}</button>
+              {editingId && <button type="button" className="schedule-btn danger" onClick={remove} disabled={saving}>削除</button>}
+              {editingId && <button type="button" className="schedule-btn" onClick={() => setEditingId(null)}>解除</button>}
+            </div>
+          </form>
         </>
       )}
 

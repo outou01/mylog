@@ -149,3 +149,14 @@ class ScheduleBlock(Base):
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+class ScheduleMessage(Base):
+    __tablename__ = "schedule_messages"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    message_date: Mapped[date] = mapped_column(Date, unique=True, nullable=False, index=True)
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    is_fallback: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
