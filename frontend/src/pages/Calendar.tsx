@@ -62,6 +62,27 @@ function minutesOf(timeText: string) {
   return h * 60 + m;
 }
 
+function timeTextFromMinutes(totalMinutes: number) {
+  const clamped = Math.max(0, Math.min(23 * 60 + 59, totalMinutes));
+  const hours = Math.floor(clamped / 60);
+  const minutes = clamped % 60;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+
+function currentHalfHourSlot(durationMinutes: number) {
+  const now = new Date();
+  let start = now.getHours() * 60 + Math.floor(now.getMinutes() / 30) * 30;
+  let end = start + durationMinutes;
+  if (end > 24 * 60) {
+    end = 24 * 60 - 1;
+    start = Math.max(0, end - durationMinutes);
+  }
+  return {
+    start_time: timeTextFromMinutes(start),
+    end_time: timeTextFromMinutes(end),
+  };
+}
+
 function displayDate(dateText: string) {
   const d = new Date(`${dateText}T00:00:00`);
   return `${d.getMonth() + 1}/${d.getDate()}`;
@@ -162,16 +183,17 @@ export default function Calendar() {
     }
   };
 
-  const quickToday = async () => {
+  const quickDuration = async (durationMinutes: number) => {
+    const slot = currentHalfHourSlot(durationMinutes);
     setSaving(true);
     try {
       await createScheduleBlock({
         date: today,
-        start_time: "20:30",
-        end_time: "21:00",
-        title: "今日の畑 30分",
+        start_time: slot.start_time,
+        end_time: slot.end_time,
+        title: durationMinutes === 30 ? "畑 30分" : "畑 1時間",
         category: "self",
-        note: "ログ入力が面倒な日でも、ここだけ見れば戻れる枠。",
+        note: "現在時刻を30分単位に丸めて登録した枠。",
       });
       await loadSchedule();
     } finally {
@@ -204,7 +226,8 @@ export default function Calendar() {
               <button className="schedule-btn primary" onClick={() => autoPlanWeek(weekStart).then(setSchedule)} disabled={saving}>
                 今週の畑枠を自動配置
               </button>
-              <button className="schedule-btn" onClick={quickToday} disabled={saving}>今日30分だけ入れる</button>
+              <button className="schedule-btn quick" onClick={() => quickDuration(30)} disabled={saving}>今から30分</button>
+              <button className="schedule-btn quick" onClick={() => quickDuration(60)} disabled={saving}>今から1時間</button>
             </div>
 
             <p className="schedule-note">
