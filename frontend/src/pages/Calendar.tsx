@@ -275,7 +275,8 @@ export default function Calendar() {
             <div className="card week-board">
               <div className="week-grid">
                 <div className="time-col">
-                  {Array.from({ length: schedule.day_end_hour - schedule.day_start_hour + 1 }, (_, i) => (
+                  <span className="time-head-spacer" />
+                  {Array.from({ length: schedule.day_end_hour - schedule.day_start_hour }, (_, i) => (
                     <span key={i}>{schedule.day_start_hour + i}:00</span>
                   ))}
                 </div>

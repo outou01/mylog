@@ -177,14 +177,17 @@ def _schedule_message(today: date, db: Session) -> str:
     stored = db.query(ScheduleMessage).filter(ScheduleMessage.message_date == today).first()
     if stored and not stored.is_fallback:
         return stored.message
+    if stored and stored.updated_at:
+        elapsed = (datetime.now() - stored.updated_at).total_seconds()
+        if elapsed < 30 * 60:
+            return stored.message
 
     message, is_fallback = _generate_schedule_message(today)
     if stored:
-        if not is_fallback:
-            stored.message = message
-            stored.is_fallback = False
-            db.commit()
-        return stored.message if stored.is_fallback else message
+        stored.message = message
+        stored.is_fallback = is_fallback
+        db.commit()
+        return message
 
     stored = ScheduleMessage(
         message_date=today,
