@@ -1,0 +1,371 @@
+.dreams-page,
+.dream-detail-page,
+.seeds-page {
+  display: grid;
+  gap: 1rem;
+}
+
+.dreams-hero,
+.project-hero,
+.project-card,
+.dream-form,
+.seed-form,
+.seed-group {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.dreams-hero,
+.project-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.2rem;
+}
+
+.dreams-hero p,
+.project-hero p,
+.project-card p,
+.dream-form p,
+.seed-form p {
+  color: #a7c9a2;
+  font-size: 0.78rem;
+  font-weight: 800;
+  margin: 0 0 0.25rem;
+}
+
+.dreams-hero h1,
+.project-hero h1,
+.project-card h2,
+.seed-group h2 {
+  color: #f6eddc;
+  margin: 0;
+}
+
+.dreams-hero span,
+.project-hero span,
+.project-card span,
+.dream-muted {
+  color: #c9d4c4;
+  line-height: 1.7;
+}
+
+.dreams-seed-link,
+.project-section-head a {
+  border: 1px solid rgba(216, 176, 95, 0.42);
+  border-radius: 8px;
+  color: #f1d899;
+  font-weight: 800;
+  padding: 0.55rem 0.8rem;
+}
+
+.dream-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.dream-card {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.dream-card-main {
+  display: grid;
+  gap: 0.8rem;
+  color: inherit;
+  padding: 0.8rem;
+}
+
+.dream-visual {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(167, 201, 162, 0.18), rgba(216, 176, 95, 0.1));
+}
+
+.dream-visual img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.dream-visual span {
+  font-size: 2.8rem;
+}
+
+.dream-card-body {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.dream-category {
+  color: #a7c9a2;
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.dream-card h2 {
+  color: #f6eddc;
+  font-size: 1.08rem;
+  margin: 0;
+}
+
+.dream-card p {
+  color: #c9d4c4;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.dream-progress {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.dream-progress div {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.dream-progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #d8b05f;
+}
+
+.dream-progress strong {
+  color: #f1d899;
+  font-family: var(--font-mono);
+}
+
+.dream-card-actions,
+.seed-actions,
+.dream-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.dream-card-actions {
+  border-top: 1px solid rgba(232, 220, 195, 0.1);
+  padding: 0.7rem 0.8rem;
+}
+
+.dream-card-actions button,
+.seed-actions button,
+.dream-form-actions button,
+.seed-mini-card button {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #f4efe5;
+  font-weight: 800;
+  min-height: 34px;
+  padding: 0.42rem 0.7rem;
+}
+
+.seed-actions button:first-child,
+.seed-mini-card button,
+.dream-form-actions button:first-child {
+  border-color: rgba(216, 176, 95, 0.42);
+  color: #f1d899;
+}
+
+.dream-form,
+.seed-form {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+  padding: 1rem;
+}
+
+.dream-form p,
+.seed-form p,
+.dream-form .wide,
+.seed-form .wide,
+.dream-form-actions {
+  grid-column: 1 / -1;
+}
+
+.dream-form label,
+.seed-form label {
+  display: grid;
+  gap: 0.35rem;
+  color: #c9d4c4;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.dream-form input,
+.dream-form textarea,
+.dream-form select,
+.seed-form input,
+.seed-form textarea,
+.seed-form select {
+  width: 100%;
+  border: 1px solid rgba(232, 220, 195, 0.16);
+  border-radius: 6px;
+  background: rgba(7, 12, 14, 0.64);
+  color: #f4efe5;
+  font: inherit;
+  padding: 0.6rem 0.7rem;
+}
+
+.dream-form textarea,
+.seed-form textarea {
+  min-height: 76px;
+  resize: vertical;
+}
+
+.project-hero {
+  justify-content: flex-start;
+}
+
+.project-icon {
+  display: grid;
+  place-items: center;
+  width: 76px;
+  height: 76px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.055);
+  font-size: 2.5rem;
+  flex: 0 0 auto;
+}
+
+.project-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 0.8fr);
+  gap: 1rem;
+}
+
+.project-card {
+  padding: 1rem;
+}
+
+.project-steps {
+  display: grid;
+  gap: 0.55rem;
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+}
+
+.project-steps li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 0.6rem;
+  color: #eef3e9;
+}
+
+.project-steps span {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: #d8b05f;
+  color: #18140d;
+  font-family: var(--font-mono);
+  font-weight: 800;
+}
+
+.project-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.85rem;
+}
+
+.seed-mini-list,
+.seed-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.seed-mini-card,
+.seed-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  align-items: center;
+  border: 1px solid rgba(232, 220, 195, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.035);
+  padding: 0.75rem;
+}
+
+.seed-mini-card span,
+.seed-card span {
+  color: #a7c9a2;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.seed-mini-card strong,
+.seed-card strong {
+  color: #f6eddc;
+}
+
+.seed-mini-card p,
+.seed-card p {
+  color: #c9d4c4;
+  line-height: 1.55;
+  margin: 0.25rem 0 0;
+}
+
+.seed-group {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem;
+}
+
+.seed-group h2 {
+  font-size: 1rem;
+}
+
+.plant-message {
+  border: 1px solid rgba(88, 183, 123, 0.35);
+  border-radius: 8px;
+  background: rgba(88, 183, 123, 0.1);
+  color: #bfe8c7;
+  font-weight: 800;
+  padding: 0.75rem 0.9rem;
+}
+
+@media (max-width: 900px) {
+  .dream-grid,
+  .project-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .dream-form,
+  .seed-form {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .dreams-hero,
+  .project-section-head,
+  .seed-mini-card,
+  .seed-card {
+    align-items: stretch;
+    grid-template-columns: 1fr;
+    flex-direction: column;
+  }
+}

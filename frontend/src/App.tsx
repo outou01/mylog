@@ -1,6 +1,8 @@
-import { Navigate, NavLink, Route, Routes } from "react-router-dom";
 import { ReactNode } from "react";
+import { Navigate, NavLink, Route, Routes } from "react-router-dom";
 import Dashboard from "./pages/Dashboard";
+import DreamDetail from "./pages/DreamDetail";
+import Dreams from "./pages/Dreams";
 import LogForm from "./pages/LogForm";
 import LogList from "./pages/LogList";
 import WeeklyReport from "./pages/WeeklyReport";
@@ -9,6 +11,7 @@ import Calendar from "./pages/Calendar";
 import MonthLog from "./pages/MonthLog";
 import PatternAnalysis from "./pages/PatternAnalysis";
 import PrivateLife from "./pages/PrivateLife";
+import Seeds from "./pages/Seeds";
 import "./App.css";
 
 function PrivateLifeRoute({ children }: { children: ReactNode }) {
@@ -23,6 +26,8 @@ export default function App() {
           <span className="logo">AI Life Console</span>
           <nav className="nav">
             <NavLink to="/" end>ホーム</NavLink>
+            <NavLink to="/dreams">夢</NavLink>
+            <NavLink to="/seeds">種リスト</NavLink>
             <NavLink to="/calendar">カレンダー</NavLink>
             <NavLink to="/private">私生活</NavLink>
           </nav>
@@ -32,6 +37,9 @@ export default function App() {
         <div className="container">
           <Routes>
             <Route path="/" element={<Dashboard />} />
+            <Route path="/dreams" element={<Dreams />} />
+            <Route path="/dreams/:id" element={<DreamDetail />} />
+            <Route path="/seeds" element={<Seeds />} />
             <Route path="/calendar" element={<Calendar />} />
 
             <Route path="/private" element={<Navigate to="/private/log" replace />} />

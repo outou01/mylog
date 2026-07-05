@@ -62,6 +62,10 @@ export interface ScheduleBlock {
   category: "work" | "self" | "life" | "rest" | string;
   note: string | null;
   editable: boolean;
+  dream_id: number | null;
+  project_id: number | null;
+  seed_task_id: number | null;
+  completed: boolean;
 }
 
 export interface WeekSchedule {
@@ -80,12 +84,23 @@ export interface ScheduleBlockPayload {
   title: string;
   category: string;
   note: string | null;
+  dream_id?: number | null;
+  project_id?: number | null;
+  seed_task_id?: number | null;
+  completed?: boolean;
 }
 
 export interface TimeCategoryTotal {
   key: string;
   label: string;
   color: string;
+  minutes: number;
+  hours: number;
+}
+
+export interface NamedTimeTotal {
+  id: number;
+  title: string;
   minutes: number;
   hours: number;
 }
@@ -113,6 +128,8 @@ export interface FieldSummary {
   total_minutes: number;
   total_hours: number;
   categories: TimeCategoryTotal[];
+  dreams: NamedTimeTotal[];
+  projects: NamedTimeTotal[];
   level: FieldLevel;
 }
 

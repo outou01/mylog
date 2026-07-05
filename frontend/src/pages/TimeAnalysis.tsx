@@ -63,6 +63,21 @@ function FieldSummaryCard({ summary }: { summary: FieldSummary }) {
           </div>
         ))}
       </div>
+
+      <div className="field-linked-totals">
+        <div>
+          <h2>夢別の積み上げ</h2>
+          {summary.dreams.length ? summary.dreams.map((dream) => (
+            <p key={dream.id}><span>{dream.title}</span><strong>{dream.hours.toFixed(1)}h</strong></p>
+          )) : <p className="muted">夢に紐づいた時間はこれから育ちます。</p>}
+        </div>
+        <div>
+          <h2>プロジェクト別の積み上げ</h2>
+          {summary.projects.length ? summary.projects.map((project) => (
+            <p key={project.id}><span>{project.title}</span><strong>{project.hours.toFixed(1)}h</strong></p>
+          )) : <p className="muted">種リストから予定を植えると、ここに積み上がります。</p>}
+        </div>
+      </div>
     </section>
   );
 }

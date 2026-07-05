@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import inspect, text
 
 from app.database import Base, engine
-from app.routers import ai_reviews, aria, briefing, calendar, daily_logs, dashboard, quick_log, weekly_report
+from app.routers import ai_reviews, aria, briefing, calendar, daily_logs, dashboard, dreams, quick_log, weekly_report
 
 Base.metadata.create_all(bind=engine)
 
@@ -43,6 +43,19 @@ def _migrate():
                 conn.execute(text(f"ALTER TABLE daily_logs ADD COLUMN {col_name} {col_def}"))
         conn.commit()
 
+    schedule_existing = {c["name"] for c in inspector.get_columns("schedule_blocks")}
+    schedule_cols = [
+        ("dream_id", "INTEGER"),
+        ("project_id", "INTEGER"),
+        ("seed_task_id", "INTEGER"),
+        ("completed", "BOOLEAN DEFAULT FALSE NOT NULL"),
+    ]
+    with engine.connect() as conn:
+        for col_name, col_def in schedule_cols:
+            if col_name not in schedule_existing:
+                conn.execute(text(f"ALTER TABLE schedule_blocks ADD COLUMN {col_name} {col_def}"))
+        conn.commit()
+
 _migrate()
 
 app = FastAPI(title="AI Life Console API", version="0.1.0")
@@ -63,6 +76,7 @@ app.include_router(briefing.router)
 app.include_router(aria.router)
 app.include_router(calendar.router)
 app.include_router(dashboard.router)
+app.include_router(dreams.router)
 
 
 @app.get("/health")

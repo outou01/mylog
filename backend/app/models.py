@@ -147,8 +147,73 @@ class ScheduleBlock(Base):
     title: Mapped[str] = mapped_column(String(120), nullable=False)
     category: Mapped[str] = mapped_column(String(40), default="self", index=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    dream_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("dreams.id"), nullable=True, index=True)
+    project_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("dream_projects.id"), nullable=True, index=True)
+    seed_task_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("seed_tasks.id"), nullable=True, index=True)
+    completed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+class Dream(Base):
+    __tablename__ = "dreams"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    title: Mapped[str] = mapped_column(String(160), nullable=False)
+    category: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    icon: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    progress: Mapped[int] = mapped_column(Integer, default=0)
+    linked_project_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    projects: Mapped[list["DreamProject"]] = relationship(
+        "DreamProject",
+        back_populates="dream",
+        cascade="all, delete-orphan",
+        foreign_keys="DreamProject.dream_id",
+    )
+    seeds: Mapped[list["SeedTask"]] = relationship("SeedTask", back_populates="dream", cascade="all, delete-orphan")
+
+
+class DreamProject(Base):
+    __tablename__ = "dream_projects"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    dream_id: Mapped[int] = mapped_column(Integer, ForeignKey("dreams.id"), nullable=False, index=True)
+    title: Mapped[str] = mapped_column(String(160), nullable=False)
+    category: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    current_position: Mapped[str | None] = mapped_column(Text, nullable=True)
+    steps: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    dream: Mapped["Dream"] = relationship("Dream", back_populates="projects", foreign_keys=[dream_id])
+    seeds: Mapped[list["SeedTask"]] = relationship("SeedTask", back_populates="project", cascade="all, delete-orphan")
+
+
+class SeedTask(Base):
+    __tablename__ = "seed_tasks"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    dream_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("dreams.id"), nullable=True, index=True)
+    project_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("dream_projects.id"), nullable=True, index=True)
+    title: Mapped[str] = mapped_column(String(160), nullable=False)
+    category: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    section: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    purpose: Mapped[str | None] = mapped_column(Text, nullable=True)
+    estimated_minutes: Mapped[int] = mapped_column(Integer, default=30)
+    status: Mapped[str] = mapped_column(String(20), default="active", index=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    dream: Mapped["Dream | None"] = relationship("Dream", back_populates="seeds")
+    project: Mapped["DreamProject | None"] = relationship("DreamProject", back_populates="seeds")
 
 
 class ScheduleMessage(Base):

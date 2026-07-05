@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import DailyLog, ScheduleBlock, ScheduleMessage, TimeAnalysisComment
+from app.models import DailyLog, Dream, DreamProject, ScheduleBlock, ScheduleMessage, TimeAnalysisComment
 
 router = APIRouter(prefix="/calendar", tags=["calendar"])
 
@@ -69,6 +69,13 @@ class TimeCategoryTotal(BaseModel):
     hours: float
 
 
+class NamedTimeTotal(BaseModel):
+    id: int
+    title: str
+    minutes: int
+    hours: float
+
+
 class TimeAnalysisSection(BaseModel):
     label: str
     start_date: str
@@ -92,6 +99,8 @@ class FieldSummary(BaseModel):
     total_minutes: int
     total_hours: float
     categories: list[TimeCategoryTotal]
+    dreams: list[NamedTimeTotal]
+    projects: list[NamedTimeTotal]
     level: FieldLevel
 
 
@@ -125,6 +134,10 @@ class ScheduleBlockOut(BaseModel):
     category: str
     note: str | None = None
     editable: bool = True
+    dream_id: int | None = None
+    project_id: int | None = None
+    seed_task_id: int | None = None
+    completed: bool = False
 
 
 class WeekScheduleOut(BaseModel):
@@ -143,6 +156,10 @@ class ScheduleBlockPayload(BaseModel):
     title: str = Field(min_length=1, max_length=120)
     category: str = Field(default="self", max_length=40)
     note: str | None = Field(default=None, max_length=2000)
+    dream_id: int | None = None
+    project_id: int | None = None
+    seed_task_id: int | None = None
+    completed: bool = False
 
     @field_validator("start_time", "end_time")
     @classmethod
@@ -208,6 +225,7 @@ def _work_blocks(start: date) -> list[ScheduleBlockOut]:
             category="work",
             note="固定: 平日 9:30-18:30",
             editable=False,
+            completed=False,
         ))
     return blocks
 
@@ -293,6 +311,10 @@ def _schedule_out(block: ScheduleBlock) -> ScheduleBlockOut:
         category=block.category,
         note=block.note,
         editable=True,
+        dream_id=block.dream_id,
+        project_id=block.project_id,
+        seed_task_id=block.seed_task_id,
+        completed=block.completed,
     )
 
 
@@ -351,9 +373,16 @@ def _field_level(total_minutes: int) -> FieldLevel:
 
 def _field_summary(db: Session) -> FieldSummary:
     totals = {category["key"]: 0 for category in TIME_CATEGORIES}
+    dream_totals: dict[int, int] = {}
+    project_totals: dict[int, int] = {}
     blocks = db.query(ScheduleBlock).filter(ScheduleBlock.category.in_(totals.keys())).all()
     for block in blocks:
-        totals[block.category] += _minutes_between(block.start_time, block.end_time)
+        minutes = _minutes_between(block.start_time, block.end_time)
+        totals[block.category] += minutes
+        if block.dream_id:
+            dream_totals[block.dream_id] = dream_totals.get(block.dream_id, 0) + minutes
+        if block.project_id:
+            project_totals[block.project_id] = project_totals.get(block.project_id, 0) + minutes
 
     categories = [
         TimeCategoryTotal(
@@ -365,11 +394,31 @@ def _field_summary(db: Session) -> FieldSummary:
         )
         for category in TIME_CATEGORIES
     ]
+    dreams = db.query(Dream).filter(Dream.id.in_(dream_totals.keys())).all() if dream_totals else []
+    projects = db.query(DreamProject).filter(DreamProject.id.in_(project_totals.keys())).all() if project_totals else []
     total_minutes = sum(totals.values())
     return FieldSummary(
         total_minutes=total_minutes,
         total_hours=round(total_minutes / 60, 1),
         categories=categories,
+        dreams=[
+            NamedTimeTotal(
+                id=dream.id,
+                title=dream.title,
+                minutes=dream_totals[dream.id],
+                hours=round(dream_totals[dream.id] / 60, 1),
+            )
+            for dream in sorted(dreams, key=lambda item: dream_totals[item.id], reverse=True)
+        ],
+        projects=[
+            NamedTimeTotal(
+                id=project.id,
+                title=project.title,
+                minutes=project_totals[project.id],
+                hours=round(project_totals[project.id] / 60, 1),
+            )
+            for project in sorted(projects, key=lambda item: project_totals[item.id], reverse=True)
+        ],
         level=_field_level(total_minutes),
     )
 
@@ -577,6 +626,10 @@ def create_schedule_block(payload: ScheduleBlockPayload, db: Session = Depends(g
         title=payload.title,
         category=payload.category,
         note=payload.note,
+        dream_id=payload.dream_id,
+        project_id=payload.project_id,
+        seed_task_id=payload.seed_task_id,
+        completed=payload.completed,
     )
     db.add(block)
     db.commit()
@@ -599,6 +652,10 @@ def update_schedule_block(block_id: int, payload: ScheduleBlockPayload, db: Sess
     block.title = payload.title
     block.category = payload.category
     block.note = payload.note
+    block.dream_id = payload.dream_id
+    block.project_id = payload.project_id
+    block.seed_task_id = payload.seed_task_id
+    block.completed = payload.completed
     db.commit()
     db.refresh(block)
     return _schedule_out(block)
