@@ -1,0 +1,66 @@
+.private-life-page {
+  display: grid;
+  gap: 1rem;
+}
+
+.private-life-head {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  padding: 1rem 1.1rem;
+}
+
+.private-life-head p {
+  color: #a7c9a2;
+  font-size: 0.78rem;
+  font-weight: 800;
+  margin: 0 0 0.25rem;
+}
+
+.private-life-head h1 {
+  color: #f6eddc;
+  font-size: 1.35rem;
+  margin: 0;
+}
+
+.private-life-tabs {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.private-life-tabs a {
+  display: grid;
+  place-items: center;
+  min-height: 40px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 0.86rem;
+  font-weight: 800;
+  padding: 0.45rem 0.6rem;
+}
+
+.private-life-tabs a:hover,
+.private-life-tabs a.active {
+  border-color: #d8b05f;
+  color: #f1d899;
+}
+
+.private-life-content {
+  min-width: 0;
+}
+
+@media (max-width: 840px) {
+  .private-life-tabs {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .private-life-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

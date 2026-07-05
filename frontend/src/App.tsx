@@ -1,4 +1,5 @@
-import { Routes, Route, NavLink } from "react-router-dom";
+import { Navigate, NavLink, Route, Routes } from "react-router-dom";
+import { ReactNode } from "react";
 import Dashboard from "./pages/Dashboard";
 import LogForm from "./pages/LogForm";
 import LogList from "./pages/LogList";
@@ -7,7 +8,12 @@ import Briefing from "./pages/Briefing";
 import Calendar from "./pages/Calendar";
 import MonthLog from "./pages/MonthLog";
 import PatternAnalysis from "./pages/PatternAnalysis";
+import PrivateLife from "./pages/PrivateLife";
 import "./App.css";
+
+function PrivateLifeRoute({ children }: { children: ReactNode }) {
+  return <PrivateLife>{children}</PrivateLife>;
+}
 
 export default function App() {
   return (
@@ -17,13 +23,8 @@ export default function App() {
           <span className="logo">AI Life Console</span>
           <nav className="nav">
             <NavLink to="/" end>ホーム</NavLink>
-            <NavLink to="/log">ログ入力</NavLink>
             <NavLink to="/calendar">カレンダー</NavLink>
-            <NavLink to="/month-log">月ログ</NavLink>
-            <NavLink to="/analysis">分析</NavLink>
-            <NavLink to="/logs">一覧</NavLink>
-            <NavLink to="/weekly">週次</NavLink>
-            <NavLink to="/briefing">週末</NavLink>
+            <NavLink to="/private">私生活</NavLink>
           </nav>
         </div>
       </header>
@@ -31,14 +32,24 @@ export default function App() {
         <div className="container">
           <Routes>
             <Route path="/" element={<Dashboard />} />
-            <Route path="/log" element={<LogForm />} />
-            <Route path="/log/edit/:id" element={<LogForm />} />
-            <Route path="/logs" element={<LogList />} />
             <Route path="/calendar" element={<Calendar />} />
-            <Route path="/month-log" element={<MonthLog />} />
-            <Route path="/analysis" element={<PatternAnalysis />} />
-            <Route path="/weekly" element={<WeeklyReport />} />
-            <Route path="/briefing" element={<Briefing />} />
+
+            <Route path="/private" element={<Navigate to="/private/log" replace />} />
+            <Route path="/private/log" element={<PrivateLifeRoute><LogForm /></PrivateLifeRoute>} />
+            <Route path="/private/log/edit/:id" element={<PrivateLifeRoute><LogForm /></PrivateLifeRoute>} />
+            <Route path="/private/logs" element={<PrivateLifeRoute><LogList /></PrivateLifeRoute>} />
+            <Route path="/private/weekly" element={<PrivateLifeRoute><WeeklyReport /></PrivateLifeRoute>} />
+            <Route path="/private/briefing" element={<PrivateLifeRoute><Briefing /></PrivateLifeRoute>} />
+            <Route path="/private/month-log" element={<PrivateLifeRoute><MonthLog /></PrivateLifeRoute>} />
+            <Route path="/private/analysis" element={<PrivateLifeRoute><PatternAnalysis /></PrivateLifeRoute>} />
+
+            <Route path="/log" element={<Navigate to="/private/log" replace />} />
+            <Route path="/log/edit/:id" element={<PrivateLifeRoute><LogForm /></PrivateLifeRoute>} />
+            <Route path="/logs" element={<Navigate to="/private/logs" replace />} />
+            <Route path="/weekly" element={<Navigate to="/private/weekly" replace />} />
+            <Route path="/briefing" element={<Navigate to="/private/briefing" replace />} />
+            <Route path="/month-log" element={<Navigate to="/private/month-log" replace />} />
+            <Route path="/analysis" element={<Navigate to="/private/analysis" replace />} />
           </Routes>
         </div>
       </main>

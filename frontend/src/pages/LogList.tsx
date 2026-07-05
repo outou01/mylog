@@ -36,7 +36,7 @@ export default function LogList() {
             <div className="log-entry-header">
               <span className="log-date">{log.date}</span>
               <span className="log-mood">{MOOD_EMOJI[log.mood_score]} {log.mood_score}/5</span>
-              <Link to={`/log/edit/${log.id}`} className="btn btn-accent btn-sm">修正</Link>
+              <Link to={`/private/log/edit/${log.id}`} className="btn btn-accent btn-sm">修正</Link>
             </div>
 
             <div className="log-entry-stats">

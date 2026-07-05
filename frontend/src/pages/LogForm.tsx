@@ -124,7 +124,7 @@ export default function LogForm() {
       } else {
         await createLog(form);
       }
-      navigate("/");
+      navigate("/private/logs");
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
       setError(msg ?? "登録に失敗しました");
@@ -142,7 +142,7 @@ export default function LogForm() {
       {!editId && (
         <>
           <div className="card" style={{ marginBottom: "1.5rem" }}>
-            <QuickLog onRegistered={() => navigate("/")} />
+            <QuickLog onRegistered={() => navigate("/private/logs")} />
           </div>
           <div className="form-divider"><span>または手動で入力</span></div>
         </>
