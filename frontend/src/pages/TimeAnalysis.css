@@ -161,7 +161,7 @@
 .analysis-section-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 1rem;
 }
 
@@ -179,7 +179,7 @@
 
 .bar-row {
   display: grid;
-  grid-template-columns: 112px minmax(120px, 1fr) 92px;
+  grid-template-columns: 112px minmax(120px, 1fr) 58px;
   align-items: center;
   gap: 0.75rem;
 }
@@ -202,9 +202,9 @@
 .bar-track {
   height: 18px;
   overflow: hidden;
-  border: 1px solid rgba(232, 220, 195, 0.12);
+  border: 1px solid rgba(232, 220, 195, 0.07);
   border-radius: 6px;
-  background: rgba(255, 255, 255, 0.055);
+  background: rgba(255, 255, 255, 0.025);
 }
 
 .bar-fill {
@@ -222,15 +222,6 @@
 
 .analysis-loading {
   color: var(--text-muted);
-}
-
-.scale-note {
-  display: flex;
-  justify-content: space-between;
-  color: var(--text-muted);
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  padding-left: 112px;
 }
 
 .aria-analysis {
@@ -286,17 +277,13 @@
   }
 
   .bar-row {
-    grid-template-columns: 1fr 86px;
+    grid-template-columns: 1fr 58px;
     gap: 0.45rem 0.65rem;
   }
 
   .bar-track {
     grid-column: 1 / -1;
     order: 3;
-  }
-
-  .scale-note {
-    padding-left: 0;
   }
 
   .aria-analysis {

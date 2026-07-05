@@ -117,14 +117,15 @@
 
 .week-grid {
   display: grid;
-  grid-template-columns: 46px repeat(7, minmax(118px, 1fr));
-  min-width: 920px;
-  min-height: 700px;
+  grid-template-columns: 44px repeat(7, minmax(104px, 1fr));
+  min-width: 0;
+  width: 100%;
+  min-height: 684px;
 }
 
 .time-col {
   display: grid;
-  grid-template-rows: 36px repeat(18, 1fr);
+  grid-template-rows: 36px repeat(18, 36px);
   color: var(--text-muted);
   font-family: var(--font-mono);
   font-size: 0.72rem;
@@ -161,14 +162,14 @@
 
 .day-lane {
   position: relative;
-  min-height: 664px;
+  min-height: 648px;
   background:
     repeating-linear-gradient(
       to bottom,
       rgba(255, 255, 255, 0.055) 0,
       rgba(255, 255, 255, 0.055) 1px,
       transparent 1px,
-      transparent 40px
+      transparent 36px
     );
 }
 
@@ -450,7 +451,7 @@
   }
 
   .week-grid {
-    min-width: 820px;
+    min-width: 760px;
   }
 
   .form-pair {

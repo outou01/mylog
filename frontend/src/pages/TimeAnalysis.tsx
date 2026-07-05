@@ -30,7 +30,7 @@ function FieldSummaryCard({ summary }: { summary: FieldSummary }) {
   return (
     <section className="field-hero">
       <div className="field-hero-copy">
-        <p className="analysis-kicker">畑の成長記録</p>
+        <p className="analysis-kicker">累計成長記録</p>
         <h1>自分の畑</h1>
         <p>
           仕事だけに人生を使わないため。
@@ -89,12 +89,12 @@ function AnalysisSection({
           <p className="analysis-kicker">{copy.title}</p>
           <h2>{section.label}</h2>
         </div>
-        <div className="analysis-total">{hours(section.total_minutes)}h</div>
       </div>
 
       <div className="bar-list">
         {section.categories.map((category) => {
-          const width = Math.min(100, (category.minutes / section.scale_minutes) * 100);
+          const rawWidth = (category.minutes / section.scale_minutes) * 100;
+          const width = category.minutes === 0 ? 0 : Math.max(4, Math.min(100, rawWidth));
           return (
             <div className="bar-row" key={category.key}>
               <div className="bar-name">
@@ -110,17 +110,10 @@ function AnalysisSection({
                   }}
                 />
               </div>
-              <div className="bar-value">
-                {category.hours.toFixed(1)}h / {section.scale_label}
-              </div>
+              <div className="bar-value">{category.hours.toFixed(1)}h</div>
             </div>
           );
         })}
-      </div>
-
-      <div className="scale-note">
-        <span>0h</span>
-        <span>右端 {section.scale_label}</span>
       </div>
 
       <div className="aria-analysis">
@@ -180,7 +173,6 @@ export default function TimeAnalysis({ embedded = false }: { embedded?: boolean 
 
       {analysis && (
         <div className="analysis-stack">
-          <FieldSummaryCard summary={analysis.field_summary} />
           <AnalysisSection
             scope="daily"
             section={analysis.daily}
@@ -202,6 +194,7 @@ export default function TimeAnalysis({ embedded = false }: { embedded?: boolean 
             requesting={requestingScope === "monthly"}
             onRequestComment={requestComment}
           />
+          <FieldSummaryCard summary={analysis.field_summary} />
         </div>
       )}
     </div>
