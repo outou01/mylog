@@ -140,9 +140,7 @@ def _seed_out(seed: SeedTask) -> SeedOut:
 
 
 def _normalize_category(category: str) -> str:
-    if category in CATEGORIES:
-        return category
-    return "creation"
+    return category.strip() if category and category.strip() else "creation"
 
 
 def _seed_defaults(db: Session) -> None:
@@ -419,7 +417,7 @@ def plant_seed(seed_id: int, payload: PlantPayload | None = None, db: Session = 
         end_time=end,
         title=seed.title,
         category=seed.category,
-        note=seed.purpose,
+        note=seed.notes or seed.purpose or seed.importance or seed.description,
         dream_id=seed.dream_id,
         project_id=seed.project_id,
         seed_task_id=seed.id,
@@ -464,7 +462,7 @@ def complete_seed(seed_id: int, payload: CompleteSeedPayload | None = None, db: 
             end_time=_end_time(start, actual_minutes),
             title=seed.title,
             category=seed.category,
-            note=seed.purpose,
+            note=seed.notes or seed.purpose or seed.importance or seed.description,
             dream_id=seed.dream_id,
             project_id=seed.project_id,
             seed_task_id=seed.id,
