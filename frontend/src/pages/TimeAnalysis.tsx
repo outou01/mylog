@@ -81,7 +81,7 @@ function AnalysisSection({
   );
 }
 
-export default function TimeAnalysis() {
+export default function TimeAnalysis({ embedded = false }: { embedded?: boolean }) {
   const today = useMemo(() => localDate(), []);
   const [targetDate, setTargetDate] = useState(today);
   const [analysis, setAnalysis] = useState<TimeAnalysisData | null>(null);
@@ -108,7 +108,7 @@ export default function TimeAnalysis() {
   };
 
   return (
-    <div className="time-analysis-page">
+    <div className={`time-analysis-page ${embedded ? "embedded" : ""}`}>
       <section className="analysis-hero">
         <div>
           <p className="analysis-kicker">時間分析</p>

@@ -5,6 +5,11 @@
   margin: 0 auto;
 }
 
+.time-analysis-page.embedded {
+  max-width: none;
+  margin: 0;
+}
+
 .analysis-hero,
 .analysis-card {
   border: 1px solid var(--border);

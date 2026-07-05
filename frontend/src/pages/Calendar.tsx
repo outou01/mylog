@@ -6,16 +6,15 @@ import {
   fetchMonthCalendar,
   fetchPatterns,
   fetchWeekCompare,
-  fetchWeeklyHours,
   fetchWeekSchedule,
   PatternInsight,
   ScheduleBlock,
   ScheduleBlockPayload,
   WeekCompare,
-  WeekHoursCompare,
   WeekSchedule,
   updateScheduleBlock,
 } from "../api/calendar";
+import TimeAnalysis from "./TimeAnalysis";
 import "./Calendar.css";
 
 const WEEKDAYS = ["月", "火", "水", "木", "金", "土", "日"];
@@ -129,7 +128,6 @@ export default function Calendar() {
 
   const [monthCells, setMonthCells] = useState<any[]>([]);
   const [compare, setCompare] = useState<WeekCompare | null>(null);
-  const [hours, setHours] = useState<WeekHoursCompare | null>(null);
   const [patterns, setPatterns] = useState<PatternInsight | null>(null);
 
   const weekDays = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
@@ -149,7 +147,6 @@ export default function Calendar() {
       fetchMonthCalendar(d.getFullYear(), d.getMonth() + 1).then(setMonthCells);
       fetchWeekCompare().then(setCompare);
     }
-    if (tab === "hours" && !hours) fetchWeeklyHours().then(setHours);
     if (tab === "patterns" && !patterns) fetchPatterns().then(setPatterns);
   }, [tab]);
 
@@ -402,21 +399,7 @@ export default function Calendar() {
       )}
 
       {tab === "hours" && (
-        <section className="card hours-card">
-          <h2 className="plain-title">自分の時間</h2>
-          {hours ? (
-            <div className="hours-total-row">
-              <div>
-                <div className="hours-total-val">{hours.this_week.total_advance_hours}h</div>
-                <div className="hours-total-label">今週</div>
-              </div>
-              <div>
-                <div className="hours-total-val muted">{hours.last_week.total_advance_hours}h</div>
-                <div className="hours-total-label">先週</div>
-              </div>
-            </div>
-          ) : <p className="no-data">読み込み中...</p>}
-        </section>
+        <TimeAnalysis embedded />
       )}
 
       {tab === "patterns" && (
