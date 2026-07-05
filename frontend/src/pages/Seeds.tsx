@@ -36,6 +36,10 @@ const TABS = [
 
 type DraftMap = Record<number, SeedPayload>;
 type SectionMap = Record<string, string[]>;
+type DragState =
+  | { type: "section"; category: string; section: string }
+  | { type: "todo"; id: number }
+  | null;
 
 function labelCategory(category: string) {
   return CATEGORY_LABEL[category] ?? category;
@@ -127,6 +131,8 @@ export default function Seeds() {
   const [customCategories, setCustomCategories] = useState<string[]>(() => storageJson("seed-categories", []));
   const [customSections, setCustomSections] = useState<SectionMap>(() => storageJson("seed-sections", {}));
   const [hiddenSections, setHiddenSections] = useState<string[]>(() => storageJson("seed-hidden-sections", []));
+  const [sectionOrder, setSectionOrder] = useState<SectionMap>(() => storageJson("seed-section-order", {}));
+  const [dragging, setDragging] = useState<DragState>(null);
   const [tab, setTab] = useState("active");
   const [keyword, setKeyword] = useState("");
   const [message, setMessage] = useState("");
@@ -156,10 +162,15 @@ export default function Seeds() {
         .filter((seed) => seed.category === category)
         .map((seed) => normalizeSection(seed.section));
       const defaults = (DEFAULT_SECTIONS[category] ?? []).filter((section) => !hiddenSections.includes(`${category}:${section}`));
-      result[category] = Array.from(new Set([UNCATEGORIZED, ...defaults, ...(customSections[category] ?? []), ...fromSeeds]));
+      const raw = Array.from(new Set([UNCATEGORIZED, ...defaults, ...(customSections[category] ?? []), ...fromSeeds]));
+      const order = sectionOrder[category] ?? [];
+      result[category] = [
+        ...order.filter((section) => raw.includes(section)),
+        ...raw.filter((section) => !order.includes(section)),
+      ];
     });
     return result;
-  }, [categories, customSections, drafts, hiddenSections, seeds]);
+  }, [categories, customSections, drafts, hiddenSections, sectionOrder, seeds]);
 
   const filteredSeeds = useMemo(() => {
     const q = keyword.trim().toLowerCase();
@@ -228,6 +239,10 @@ export default function Seeds() {
       [category]: (customSections[category] ?? []).filter((item) => item !== section),
     };
     const nextHidden = Array.from(new Set([...hiddenSections, `${category}:${section}`]));
+    const nextOrderMap = {
+      ...sectionOrder,
+      [category]: (sectionsByCategory[category] ?? []).filter((item) => item !== section),
+    };
     const affected = seeds.filter((seed) => {
       const draft = drafts[seed.id] ?? toPayload(seed);
       return draft.category === category && normalizeSection(draft.section) === section;
@@ -235,8 +250,10 @@ export default function Seeds() {
     const updated = await Promise.all(affected.map((seed) => updateSeed(seed.id, { ...(drafts[seed.id] ?? toPayload(seed)), section: UNCATEGORIZED })));
     setCustomSections(nextCustom);
     setHiddenSections(nextHidden);
+    setSectionOrder(nextOrderMap);
     localStorage.setItem("seed-sections", JSON.stringify(nextCustom));
     localStorage.setItem("seed-hidden-sections", JSON.stringify(nextHidden));
+    localStorage.setItem("seed-section-order", JSON.stringify(nextOrderMap));
     setSeeds((current) => current.map((seed) => updated.find((item) => item.id === seed.id) ?? seed));
     setDrafts((current) => {
       const next = { ...current };
@@ -244,6 +261,58 @@ export default function Seeds() {
       return next;
     });
     setMessage(`${section} を削除し、中のTodoを ${UNCATEGORIZED} に移しました。`);
+  };
+
+  const moveSection = (category: string, targetSection: string) => {
+    if (!dragging || dragging.type !== "section" || dragging.category !== category || dragging.section === targetSection) return;
+    const current = sectionsByCategory[category] ?? [];
+    const without = current.filter((section) => section !== dragging.section);
+    const targetIndex = without.indexOf(targetSection);
+    if (targetIndex < 0) return;
+    const nextList = [...without.slice(0, targetIndex), dragging.section, ...without.slice(targetIndex)];
+    const next = { ...sectionOrder, [category]: nextList };
+    setSectionOrder(next);
+    localStorage.setItem("seed-section-order", JSON.stringify(next));
+    setDragging(null);
+  };
+
+  const moveTodo = async (target: SeedTask) => {
+    if (!dragging || dragging.type !== "todo" || dragging.id === target.id) return;
+    const dragged = seeds.find((seed) => seed.id === dragging.id);
+    if (!dragged) return;
+    const draggedDraft = drafts[dragged.id] ?? toPayload(dragged);
+    const targetDraft = drafts[target.id] ?? toPayload(target);
+    if (
+      draggedDraft.parent_id !== targetDraft.parent_id ||
+      draggedDraft.category !== targetDraft.category ||
+      normalizeSection(draggedDraft.section) !== normalizeSection(targetDraft.section)
+    ) {
+      setDragging(null);
+      return;
+    }
+    const siblings = seeds
+      .filter((seed) => {
+        const draft = drafts[seed.id] ?? toPayload(seed);
+        return draft.parent_id === targetDraft.parent_id &&
+          draft.category === targetDraft.category &&
+          normalizeSection(draft.section) === normalizeSection(targetDraft.section);
+      })
+      .sort((a, b) => ((drafts[a.id]?.sort_order ?? a.sort_order) - (drafts[b.id]?.sort_order ?? b.sort_order)) || a.id - b.id);
+    const reordered = siblings.filter((seed) => seed.id !== dragged.id);
+    const targetIndex = reordered.findIndex((seed) => seed.id === target.id);
+    if (targetIndex < 0) return;
+    reordered.splice(targetIndex, 0, dragged);
+    const updated = await Promise.all(reordered.map((seed, index) => updateSeed(seed.id, {
+      ...(drafts[seed.id] ?? toPayload(seed)),
+      sort_order: (index + 1) * 10,
+    })));
+    setSeeds((current) => current.map((seed) => updated.find((item) => item.id === seed.id) ?? seed));
+    setDrafts((current) => {
+      const next = { ...current };
+      updated.forEach((seed) => { next[seed.id] = toPayload(seed); });
+      return next;
+    });
+    setDragging(null);
   };
 
   const addTodo = async (category: string, section: string, parent?: SeedTask) => {
@@ -298,7 +367,14 @@ export default function Seeds() {
     const isCollapsed = collapsedTodos.has(seed.id);
     const isChild = draft.parent_id != null;
     return [
-      <tr key={seed.id} className={`${draft.status === "done" ? "is-done" : ""} ${isChild ? "is-child" : ""}`}>
+      <tr
+        key={seed.id}
+        className={`${draft.status === "done" ? "is-done" : ""} ${isChild ? "is-child" : ""}`}
+        draggable
+        onDragStart={() => setDragging({ type: "todo", id: seed.id })}
+        onDragOver={(event) => event.preventDefault()}
+        onDrop={() => moveTodo(seed)}
+      >
         <td className="seed-tree-priority">
           <input value={draft.priority ?? ""} onChange={(event) => updateDraft(seed.id, { priority: event.target.value })} onBlur={() => save(seed)} />
         </td>
@@ -317,7 +393,7 @@ export default function Seeds() {
         </td>
         <td>
           <div className="seed-tree-actions">
-            <button type="button" onClick={() => addTodo(draft.category, normalizeSection(draft.section), seed)}>子Todo追加</button>
+            <button type="button" onClick={() => addTodo(draft.category, normalizeSection(draft.section), seed)}>子追加</button>
             <button type="button" onClick={() => complete(seed)} disabled={draft.status === "done"}>完了</button>
             <button type="button" onClick={() => remove(seed)}>削除</button>
             <button type="button" onClick={() => plant(seed)} disabled={plantingId === seed.id || draft.status === "done"}>カレンダーに追加</button>
@@ -347,7 +423,7 @@ export default function Seeds() {
         <div>
           <p>種リスト</p>
           <h1>カテゴリ別ツリーTodo表</h1>
-          <span>親カテゴリ、小カテゴリ、Todo、派生Todoを軽く整理する作業台です。</span>
+          <span>小カテゴリとTodoはドラッグで並び替えできます。</span>
         </div>
         <button type="button" onClick={addCategory}>親カテゴリ追加</button>
       </section>
@@ -370,7 +446,7 @@ export default function Seeds() {
           <section className={categoryClass(category)} key={category}>
             <header>
               <h2>{labelCategory(category)}</h2>
-              <button type="button" onClick={() => addSection(category)}>小カテゴリ追加</button>
+              <button className="seed-category-add" type="button" onClick={() => addSection(category)}>小カテゴリ追加</button>
             </header>
             {(sectionsByCategory[category] ?? []).map((section) => {
               const sectionKey = `${category}:${section}`;
@@ -382,7 +458,14 @@ export default function Seeds() {
                 .sort((a, b) => ((drafts[a.id]?.sort_order ?? a.sort_order) - (drafts[b.id]?.sort_order ?? b.sort_order)) || a.id - b.id);
               const collapsed = collapsedSections.has(sectionKey);
               return (
-                <article className="seed-section-block" key={sectionKey}>
+                <article
+                  className="seed-section-block"
+                  key={sectionKey}
+                  draggable
+                  onDragStart={() => setDragging({ type: "section", category, section })}
+                  onDragOver={(event) => event.preventDefault()}
+                  onDrop={() => moveSection(category, section)}
+                >
                   <div className="seed-section-title">
                     <button type="button" onClick={() => setCollapsedSections((current) => {
                       const next = new Set(current);
@@ -397,14 +480,6 @@ export default function Seeds() {
                   {!collapsed && (
                     <div className="seed-tree-table-wrap">
                       <table className="seed-tree-table">
-                        <thead>
-                          <tr>
-                            <th>優先度</th>
-                            <th>内容</th>
-                            <th>備考・悩み</th>
-                            <th>操作</th>
-                          </tr>
-                        </thead>
                         <tbody>
                           {sectionSeeds.flatMap(renderTodo)}
                           {!sectionSeeds.length && (

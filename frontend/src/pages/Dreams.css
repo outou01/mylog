@@ -1340,3 +1340,55 @@
 .seed-empty-row {
   padding: 0.55rem !important;
 }
+
+.seed-category-add {
+  border-color: color-mix(in srgb, var(--category-accent) 34%, transparent) !important;
+  background: color-mix(in srgb, var(--category-accent) 10%, rgba(255, 255, 255, 0.035)) !important;
+  color: #f6eddc !important;
+  font-size: 0.74rem !important;
+  padding: 0.34rem 0.58rem !important;
+}
+
+.seed-section-block {
+  cursor: grab;
+}
+
+.seed-section-block:active {
+  cursor: grabbing;
+}
+
+.seed-tree-table {
+  min-width: 0;
+  table-layout: fixed;
+}
+
+.seed-tree-table td:nth-child(1) { width: 64px; }
+.seed-tree-table td:nth-child(2) { width: auto; }
+.seed-tree-table td:nth-child(3) { width: 86px; }
+.seed-tree-table td:nth-child(4) { width: 292px; }
+
+.seed-tree-table-wrap {
+  overflow-x: visible;
+}
+
+.seed-tree-table tr[draggable="true"] {
+  cursor: grab;
+}
+
+.seed-tree-table tr[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+.seed-tree-actions {
+  flex-wrap: wrap;
+  overflow-x: visible;
+}
+
+.seed-tree-actions button {
+  flex: 0 0 auto;
+  line-height: 1.1;
+}
+
+.seed-tree-actions button:last-of-type {
+  margin-left: auto;
+}
