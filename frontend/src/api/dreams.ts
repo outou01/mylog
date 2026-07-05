@@ -40,12 +40,17 @@ export interface SeedTask {
   category: string;
   dream_id: number | null;
   project_id: number | null;
+  priority: string | null;
   section: string | null;
   description: string | null;
   purpose: string | null;
+  concern: string | null;
+  motivation: string | null;
   estimated_minutes: number;
+  actual_minutes: number | null;
   status: string;
   notes: string | null;
+  completed_at: string | null;
 }
 
 export interface SeedPayload {
@@ -53,10 +58,14 @@ export interface SeedPayload {
   category: string;
   dream_id: number | null;
   project_id: number | null;
+  priority: string | null;
   section: string | null;
   description: string | null;
   purpose: string | null;
+  concern: string | null;
+  motivation: string | null;
   estimated_minutes: number;
+  actual_minutes: number | null;
   status: string;
   notes: string | null;
 }
@@ -103,3 +112,6 @@ export const deleteSeed = (id: number) =>
 
 export const plantSeed = (id: number) =>
   api.post<PlantedSeed>(`/dreams/seeds/${id}/plant`, {}).then((r) => r.data);
+
+export const completeSeed = (id: number, actual_minutes?: number | null) =>
+  api.post<SeedTask>(`/dreams/seeds/${id}/complete`, { actual_minutes }).then((r) => r.data);

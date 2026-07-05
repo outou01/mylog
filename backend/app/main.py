@@ -56,6 +56,20 @@ def _migrate():
                 conn.execute(text(f"ALTER TABLE schedule_blocks ADD COLUMN {col_name} {col_def}"))
         conn.commit()
 
+    seed_existing = {c["name"] for c in inspector.get_columns("seed_tasks")}
+    seed_cols = [
+        ("priority", "VARCHAR(20)"),
+        ("concern", "TEXT"),
+        ("motivation", "TEXT"),
+        ("actual_minutes", "INTEGER"),
+        ("completed_at", "TIMESTAMP"),
+    ]
+    with engine.connect() as conn:
+        for col_name, col_def in seed_cols:
+            if col_name not in seed_existing:
+                conn.execute(text(f"ALTER TABLE seed_tasks ADD COLUMN {col_name} {col_def}"))
+        conn.commit()
+
 _migrate()
 
 app = FastAPI(title="AI Life Console API", version="0.1.0")

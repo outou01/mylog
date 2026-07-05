@@ -45,16 +45,25 @@ class SeedPayload(BaseModel):
     category: str = Field(max_length=40)
     dream_id: int | None = None
     project_id: int | None = None
+    priority: str | None = Field(default=None, max_length=20)
     section: str | None = Field(default=None, max_length=80)
     description: str | None = None
     purpose: str | None = None
+    concern: str | None = None
+    motivation: str | None = None
     estimated_minutes: int = Field(default=30, ge=5, le=480)
+    actual_minutes: int | None = Field(default=None, ge=0, le=1440)
     status: str = Field(default="active", max_length=20)
     notes: str | None = None
 
 
 class SeedOut(SeedPayload):
     id: int
+    completed_at: str | None = None
+
+
+class CompleteSeedPayload(BaseModel):
+    actual_minutes: int | None = Field(default=None, ge=0, le=1440)
 
 
 class ProjectDetailOut(BaseModel):
@@ -108,12 +117,17 @@ def _seed_out(seed: SeedTask) -> SeedOut:
         project_id=seed.project_id,
         title=seed.title,
         category=seed.category,
+        priority=seed.priority,
         section=seed.section,
         description=seed.description,
         purpose=seed.purpose,
+        concern=seed.concern,
+        motivation=seed.motivation,
         estimated_minutes=seed.estimated_minutes,
+        actual_minutes=seed.actual_minutes,
         status=seed.status,
         notes=seed.notes,
+        completed_at=seed.completed_at.isoformat() if seed.completed_at else None,
     )
 
 
@@ -335,7 +349,7 @@ def update_project(project_id: int, payload: ProjectPayload, db: Session = Depen
 @router.get("/seeds/list", response_model=list[SeedOut])
 def list_seeds(db: Session = Depends(get_db)):
     _seed_defaults(db)
-    seeds = db.query(SeedTask).order_by(SeedTask.category.asc(), SeedTask.section.asc(), SeedTask.id.asc()).all()
+    seeds = db.query(SeedTask).order_by(SeedTask.category.asc(), SeedTask.section.asc(), SeedTask.priority.asc(), SeedTask.id.asc()).all()
     return [_seed_out(seed) for seed in seeds]
 
 
@@ -393,6 +407,7 @@ def plant_seed(seed_id: int, payload: PlantPayload | None = None, db: Session = 
         project_id=seed.project_id,
         seed_task_id=seed.id,
     )
+    seed.status = "planted"
     db.add(block)
     db.commit()
     db.refresh(block)
@@ -402,3 +417,43 @@ def plant_seed(seed_id: int, payload: PlantPayload | None = None, db: Session = 
         start_time=_time_text(block.start_time),
         end_time=_time_text(block.end_time),
     )
+
+
+@router.post("/seeds/{seed_id}/complete", response_model=SeedOut)
+def complete_seed(seed_id: int, payload: CompleteSeedPayload | None = None, db: Session = Depends(get_db)):
+    seed = db.query(SeedTask).filter(SeedTask.id == seed_id).first()
+    if not seed:
+        raise HTTPException(status_code=404, detail="Seed not found")
+
+    payload = payload or CompleteSeedPayload()
+    actual_minutes = payload.actual_minutes or seed.actual_minutes or seed.estimated_minutes
+    seed.status = "done"
+    seed.actual_minutes = actual_minutes
+    seed.completed_at = datetime.now()
+
+    existing_block = (
+        db.query(ScheduleBlock)
+        .filter(ScheduleBlock.seed_task_id == seed.id)
+        .order_by(ScheduleBlock.date.desc(), ScheduleBlock.start_time.desc())
+        .first()
+    )
+    if existing_block:
+        existing_block.completed = True
+    else:
+        start = _default_start()
+        db.add(ScheduleBlock(
+            date=dt_date.today(),
+            start_time=start,
+            end_time=_end_time(start, actual_minutes),
+            title=seed.title,
+            category=seed.category,
+            note=seed.purpose,
+            dream_id=seed.dream_id,
+            project_id=seed.project_id,
+            seed_task_id=seed.id,
+            completed=True,
+        ))
+
+    db.commit()
+    db.refresh(seed)
+    return _seed_out(seed)

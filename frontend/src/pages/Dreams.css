@@ -347,6 +347,249 @@
   padding: 0.75rem 0.9rem;
 }
 
+.table-mode {
+  max-width: none;
+}
+
+.seed-workbench-head,
+.seed-toolbar,
+.seed-table-group,
+.seed-empty {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.seed-workbench-head {
+  padding: 1rem 1.1rem;
+}
+
+.seed-workbench-head p {
+  color: #a7c9a2;
+  font-size: 0.78rem;
+  font-weight: 800;
+  margin: 0 0 0.25rem;
+}
+
+.seed-workbench-head h1 {
+  color: #f6eddc;
+  font-size: 1.35rem;
+  margin: 0;
+}
+
+.seed-workbench-head span {
+  color: #c9d4c4;
+  display: block;
+  line-height: 1.6;
+  margin-top: 0.35rem;
+}
+
+.seed-toolbar {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.8rem;
+}
+
+.seed-tabs,
+.seed-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.seed-tabs button,
+.seed-filters input,
+.seed-filters select,
+.seed-link-btn,
+.seed-table-actions button {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: rgba(7, 12, 14, 0.64);
+  color: #f4efe5;
+  font: inherit;
+  font-size: 0.82rem;
+  min-height: 34px;
+  padding: 0.42rem 0.6rem;
+}
+
+.seed-tabs button {
+  color: var(--text-muted);
+  font-weight: 800;
+}
+
+.seed-tabs button.active {
+  border-color: #d8b05f;
+  color: #f1d899;
+}
+
+.seed-filters input {
+  min-width: 220px;
+}
+
+.seed-table-stack {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.seed-table-group {
+  overflow: hidden;
+}
+
+.seed-table-group h2 {
+  border-bottom: 1px solid rgba(232, 220, 195, 0.1);
+  color: #f6eddc;
+  font-size: 0.98rem;
+  margin: 0;
+  padding: 0.7rem 0.85rem;
+}
+
+.seed-table-wrap {
+  overflow-x: auto;
+}
+
+.seed-table {
+  width: 100%;
+  min-width: 1120px;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.seed-table th,
+.seed-table td {
+  border-bottom: 1px solid rgba(232, 220, 195, 0.08);
+  padding: 0.55rem 0.6rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.seed-table th {
+  background: rgba(255, 255, 255, 0.035);
+  color: #a7c9a2;
+  font-size: 0.74rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.seed-table td {
+  color: #d8e0d4;
+}
+
+.seed-priority {
+  color: #f1d899;
+  font-family: var(--font-mono);
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.seed-title-cell {
+  color: #f6eddc;
+  font-weight: 800;
+  min-width: 150px;
+}
+
+.seed-status {
+  display: inline-grid;
+  place-items: center;
+  min-width: 64px;
+  border: 1px solid rgba(232, 220, 195, 0.14);
+  border-radius: 999px;
+  color: #c9d4c4;
+  font-size: 0.74rem;
+  font-weight: 800;
+  padding: 0.18rem 0.45rem;
+  white-space: nowrap;
+}
+
+.seed-status.planted,
+.seed-status.in_progress {
+  border-color: rgba(93, 156, 236, 0.38);
+  color: #9fc8ff;
+}
+
+.seed-status.done {
+  border-color: rgba(88, 183, 123, 0.38);
+  color: #9ee0b1;
+}
+
+.seed-status.archived {
+  color: var(--text-muted);
+  opacity: 0.72;
+}
+
+.seed-link-btn {
+  color: #f1d899;
+  font-weight: 800;
+}
+
+.seed-table-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  min-width: 250px;
+}
+
+.seed-table-actions button {
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.seed-table-actions button:first-child {
+  border-color: rgba(216, 176, 95, 0.42);
+  color: #f1d899;
+}
+
+.seed-table-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.seed-detail-row td {
+  background: rgba(255, 255, 255, 0.025);
+  padding: 0.8rem;
+}
+
+.seed-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.seed-detail-grid p {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0;
+}
+
+.seed-detail-grid strong {
+  color: #a7c9a2;
+  font-size: 0.76rem;
+}
+
+.seed-detail-grid span {
+  color: #d8e0d4;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.seed-empty {
+  color: var(--text-muted);
+  padding: 1rem;
+}
+
+.seed-form.compact {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.seed-form.compact .wide {
+  grid-column: span 3;
+}
+
+.seed-form.compact p,
+.seed-form.compact .dream-form-actions {
+  grid-column: 1 / -1;
+}
+
 @media (max-width: 900px) {
   .dream-grid,
   .project-layout {
@@ -356,6 +599,13 @@
   .dream-form,
   .seed-form {
     grid-template-columns: 1fr;
+  }
+
+  .seed-detail-grid,
+  .seed-form.compact,
+  .seed-form.compact .wide {
+    grid-template-columns: 1fr;
+    grid-column: 1;
   }
 }
 
