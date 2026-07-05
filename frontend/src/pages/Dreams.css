@@ -1201,3 +1201,142 @@
     flex-direction: column;
   }
 }
+
+.seed-category-panel {
+  --category-accent: #a7c9a2;
+  border-color: color-mix(in srgb, var(--category-accent) 34%, transparent);
+}
+
+.seed-category-creation {
+  --category-accent: #b77ce8;
+}
+
+.seed-category-job_search {
+  --category-accent: #6fa8ff;
+}
+
+.seed-category-social {
+  --category-accent: #65c98a;
+}
+
+.seed-category-workout {
+  --category-accent: #ff8a5f;
+}
+
+.seed-category-panel > header {
+  background: color-mix(in srgb, var(--category-accent) 11%, transparent);
+  border-bottom-color: color-mix(in srgb, var(--category-accent) 28%, transparent);
+}
+
+.seed-category-panel h2 {
+  color: #f6eddc;
+}
+
+.seed-category-panel h2::before {
+  background: var(--category-accent);
+  border-radius: 999px;
+  content: "";
+  display: inline-block;
+  height: 0.72rem;
+  margin-right: 0.5rem;
+  width: 0.72rem;
+}
+
+.seed-section-title {
+  background: color-mix(in srgb, var(--category-accent) 6%, rgba(255, 255, 255, 0.018));
+  gap: 0.4rem;
+  min-height: 38px;
+  padding: 0.34rem 0.6rem;
+}
+
+.seed-section-title strong {
+  color: #dce8d9;
+  font-size: 0.84rem;
+}
+
+.seed-section-title button {
+  border-color: rgba(232, 220, 195, 0.14);
+  background: rgba(255, 255, 255, 0.035);
+  color: #cfd8ca;
+  font-size: 0.7rem;
+  padding: 0.24rem 0.42rem;
+}
+
+.seed-section-title button:first-child {
+  color: var(--category-accent);
+  min-width: 28px;
+}
+
+.seed-section-title button:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
+}
+
+.seed-tree-table {
+  min-width: 760px;
+}
+
+.seed-tree-table th:nth-child(1) { width: 64px; }
+.seed-tree-table th:nth-child(2) { width: 380px; }
+.seed-tree-table th:nth-child(3) { width: 92px; }
+.seed-tree-table th:nth-child(4) { width: 224px; }
+
+.seed-tree-table th,
+.seed-tree-table td {
+  font-size: 0.8rem;
+  padding: 0.32rem 0.45rem;
+}
+
+.seed-tree-table th {
+  background: color-mix(in srgb, var(--category-accent) 8%, rgba(19, 29, 47, 0.9));
+}
+
+.seed-tree-title-inner input {
+  font-weight: 800;
+}
+
+.seed-tree-table tr.is-child td {
+  background: rgba(255, 255, 255, 0.018);
+  color: #adbac0;
+  font-size: 0.76rem;
+}
+
+.seed-tree-table tr.is-child .seed-tree-title-inner input {
+  color: #aebbd0;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.seed-tree-table tr.is-child .seed-tree-title-inner > button {
+  color: var(--category-accent);
+}
+
+.seed-tree-actions {
+  flex-wrap: nowrap;
+  justify-content: flex-start;
+  overflow-x: auto;
+}
+
+.seed-tree-actions button {
+  border-color: rgba(232, 220, 195, 0.13);
+  background: rgba(255, 255, 255, 0.035);
+  color: #d7dfd4;
+  font-size: 0.7rem;
+  padding: 0.28rem 0.38rem;
+}
+
+.seed-tree-actions button:last-of-type {
+  border-color: color-mix(in srgb, var(--category-accent) 42%, transparent);
+  color: #f1d899;
+}
+
+.seed-note-toggle {
+  border-color: color-mix(in srgb, var(--category-accent) 36%, transparent);
+  color: #dce8d9;
+  font-size: 0.72rem;
+  padding: 0.28rem 0.45rem;
+}
+
+.seed-empty-row {
+  padding: 0.55rem !important;
+}

@@ -11,7 +11,9 @@ import {
 } from "../api/dreams";
 import "./Dreams.css";
 
+const UNCATEGORIZED = "-";
 const DEFAULT_CATEGORIES = ["creation", "job_search", "social"];
+
 const CATEGORY_LABEL: Record<string, string> = {
   creation: "創作",
   job_search: "転職活動",
@@ -25,20 +27,10 @@ const DEFAULT_SECTIONS: Record<string, string[]> = {
   social: ["外出", "筋トレ", "身だしなみ"],
 };
 
-const STATUS_LABEL: Record<string, string> = {
-  active: "未着手",
-  planted: "今日植えた",
-  in_progress: "進行中",
-  done: "完了",
-  archived: "アーカイブ",
-  paused: "保留",
-};
-
 const TABS = [
   { key: "active", label: "進行中" },
-  { key: "candidates", label: "今日植える候補" },
+  { key: "candidates", label: "候補" },
   { key: "done", label: "完了済み" },
-  { key: "archived", label: "アーカイブ" },
   { key: "all", label: "すべて" },
 ];
 
@@ -47,6 +39,18 @@ type SectionMap = Record<string, string[]>;
 
 function labelCategory(category: string) {
   return CATEGORY_LABEL[category] ?? category;
+}
+
+function normalizeSection(section: string | null | undefined) {
+  return section?.trim() || UNCATEGORIZED;
+}
+
+function storageJson<T>(key: string, fallback: T): T {
+  try {
+    return JSON.parse(localStorage.getItem(key) ?? "") as T;
+  } catch {
+    return fallback;
+  }
 }
 
 function noteText(seed: SeedPayload | SeedTask) {
@@ -74,7 +78,7 @@ function toPayload(seed: SeedTask): SeedPayload {
     priority: seed.priority,
     depth: seed.depth,
     sort_order: seed.sort_order,
-    section: seed.section,
+    section: normalizeSection(seed.section),
     description: seed.description,
     purpose: seed.purpose,
     importance: seed.importance,
@@ -110,20 +114,8 @@ function newPayload(category: string, section: string, sortOrder: number, parent
   };
 }
 
-function readStoredSections(): SectionMap {
-  try {
-    return JSON.parse(localStorage.getItem("seed-sections") ?? "{}");
-  } catch {
-    return {};
-  }
-}
-
-function readStoredCategories(): string[] {
-  try {
-    return JSON.parse(localStorage.getItem("seed-categories") ?? "[]");
-  } catch {
-    return [];
-  }
+function categoryClass(category: string) {
+  return `seed-category-panel seed-category-${category.replace(/[^a-z0-9_-]/gi, "-")}`;
 }
 
 export default function Seeds() {
@@ -132,8 +124,9 @@ export default function Seeds() {
   const [expandedNotes, setExpandedNotes] = useState<Set<number>>(new Set());
   const [collapsedTodos, setCollapsedTodos] = useState<Set<number>>(new Set());
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
-  const [customCategories, setCustomCategories] = useState<string[]>(readStoredCategories);
-  const [customSections, setCustomSections] = useState<SectionMap>(readStoredSections);
+  const [customCategories, setCustomCategories] = useState<string[]>(() => storageJson("seed-categories", []));
+  const [customSections, setCustomSections] = useState<SectionMap>(() => storageJson("seed-sections", {}));
+  const [hiddenSections, setHiddenSections] = useState<string[]>(() => storageJson("seed-hidden-sections", []));
   const [tab, setTab] = useState("active");
   const [keyword, setKeyword] = useState("");
   const [message, setMessage] = useState("");
@@ -161,11 +154,12 @@ export default function Seeds() {
       const fromSeeds = seeds
         .map((seed) => drafts[seed.id] ?? toPayload(seed))
         .filter((seed) => seed.category === category)
-        .map((seed) => seed.section || "未分類");
-      result[category] = Array.from(new Set([...(DEFAULT_SECTIONS[category] ?? []), ...(customSections[category] ?? []), ...fromSeeds]));
+        .map((seed) => normalizeSection(seed.section));
+      const defaults = (DEFAULT_SECTIONS[category] ?? []).filter((section) => !hiddenSections.includes(`${category}:${section}`));
+      result[category] = Array.from(new Set([UNCATEGORIZED, ...defaults, ...(customSections[category] ?? []), ...fromSeeds]));
     });
     return result;
-  }, [categories, customSections, drafts, seeds]);
+  }, [categories, customSections, drafts, hiddenSections, seeds]);
 
   const filteredSeeds = useMemo(() => {
     const q = keyword.trim().toLowerCase();
@@ -174,7 +168,6 @@ export default function Seeds() {
       if (tab === "active" && !["active", "planted", "in_progress", "paused"].includes(draft.status)) return false;
       if (tab === "candidates" && draft.status !== "active") return false;
       if (tab === "done" && draft.status !== "done") return false;
-      if (tab === "archived" && draft.status !== "archived") return false;
       if (!q) return true;
       return [draft.priority, draft.title, draft.category, draft.section, noteText(draft), draft.status].join(" ").toLowerCase().includes(q);
     });
@@ -212,8 +205,7 @@ export default function Seeds() {
   const addCategory = () => {
     const name = window.prompt("追加する親カテゴリ名");
     if (!name?.trim()) return;
-    const value = name.trim();
-    const next = Array.from(new Set([...customCategories, value]));
+    const next = Array.from(new Set([...customCategories, name.trim()]));
     setCustomCategories(next);
     localStorage.setItem("seed-categories", JSON.stringify(next));
   };
@@ -227,6 +219,31 @@ export default function Seeds() {
     };
     setCustomSections(next);
     localStorage.setItem("seed-sections", JSON.stringify(next));
+  };
+
+  const deleteSection = async (category: string, section: string) => {
+    if (section === UNCATEGORIZED) return;
+    const nextCustom = {
+      ...customSections,
+      [category]: (customSections[category] ?? []).filter((item) => item !== section),
+    };
+    const nextHidden = Array.from(new Set([...hiddenSections, `${category}:${section}`]));
+    const affected = seeds.filter((seed) => {
+      const draft = drafts[seed.id] ?? toPayload(seed);
+      return draft.category === category && normalizeSection(draft.section) === section;
+    });
+    const updated = await Promise.all(affected.map((seed) => updateSeed(seed.id, { ...(drafts[seed.id] ?? toPayload(seed)), section: UNCATEGORIZED })));
+    setCustomSections(nextCustom);
+    setHiddenSections(nextHidden);
+    localStorage.setItem("seed-sections", JSON.stringify(nextCustom));
+    localStorage.setItem("seed-hidden-sections", JSON.stringify(nextHidden));
+    setSeeds((current) => current.map((seed) => updated.find((item) => item.id === seed.id) ?? seed));
+    setDrafts((current) => {
+      const next = { ...current };
+      updated.forEach((seed) => { next[seed.id] = toPayload(seed); });
+      return next;
+    });
+    setMessage(`${section} を削除し、中のTodoを ${UNCATEGORIZED} に移しました。`);
   };
 
   const addTodo = async (category: string, section: string, parent?: SeedTask) => {
@@ -246,7 +263,7 @@ export default function Seeds() {
     setPlantingId(seed.id);
     try {
       const planted = await plantSeed(seed.id);
-      setMessage(`${seed.title} を ${planted.start_time}-${planted.end_time} に植えました。`);
+      setMessage(`${seed.title} を ${planted.start_time}-${planted.end_time} に追加しました。`);
       await load();
     } finally {
       setPlantingId(null);
@@ -256,12 +273,6 @@ export default function Seeds() {
   const complete = async (seed: SeedTask) => {
     const draft = drafts[seed.id] ?? toPayload(seed);
     const saved = await completeSeed(seed.id, draft.actual_minutes || draft.estimated_minutes);
-    setSeeds((current) => current.map((item) => (item.id === seed.id ? saved : item)));
-    setDrafts((current) => ({ ...current, [seed.id]: toPayload(saved) }));
-  };
-
-  const archive = async (seed: SeedTask) => {
-    const saved = await updateSeed(seed.id, { ...(drafts[seed.id] ?? toPayload(seed)), status: "archived" });
     setSeeds((current) => current.map((item) => (item.id === seed.id ? saved : item)));
     setDrafts((current) => ({ ...current, [seed.id]: toPayload(saved) }));
   };
@@ -285,28 +296,18 @@ export default function Seeds() {
     const childRows = childrenByParent.get(seed.id) ?? [];
     const isExpanded = expandedNotes.has(seed.id);
     const isCollapsed = collapsedTodos.has(seed.id);
+    const isChild = draft.parent_id != null;
     return [
-      <tr key={seed.id} className={draft.status === "done" ? "is-done" : ""}>
+      <tr key={seed.id} className={`${draft.status === "done" ? "is-done" : ""} ${isChild ? "is-child" : ""}`}>
         <td className="seed-tree-priority">
           <input value={draft.priority ?? ""} onChange={(event) => updateDraft(seed.id, { priority: event.target.value })} onBlur={() => save(seed)} />
-        </td>
-        <td className="seed-tree-section">
-          <select value={draft.section ?? "未分類"} onChange={(event) => updateDraft(seed.id, { section: event.target.value })} onBlur={() => save(seed)}>
-            {(sectionsByCategory[draft.category] ?? ["未分類"]).map((section) => <option value={section} key={section}>{section}</option>)}
-          </select>
         </td>
         <td className="seed-tree-title" style={{ paddingLeft: 10 + draft.depth * 22 }}>
           <div className="seed-tree-title-inner">
             <button type="button" disabled={!childRows.length} onClick={() => toggleSet(setCollapsedTodos, seed.id)}>
-              {childRows.length ? (isCollapsed ? "▶" : "▼") : "・"}
+              {childRows.length ? (isCollapsed ? "▶" : "▼") : isChild ? "└" : "・"}
             </button>
             <input value={draft.title} onChange={(event) => updateDraft(seed.id, { title: event.target.value })} onBlur={() => save(seed)} />
-          </div>
-        </td>
-        <td className="seed-tree-minutes">
-          <div className="seed-tree-minutes-inner">
-            <input type="number" min="5" max="480" value={draft.estimated_minutes} onChange={(event) => updateDraft(seed.id, { estimated_minutes: Number(event.target.value) })} onBlur={() => save(seed)} />
-            <span>分</span>
           </div>
         </td>
         <td>
@@ -315,24 +316,18 @@ export default function Seeds() {
           </button>
         </td>
         <td>
-          <select value={draft.status} onChange={(event) => updateDraft(seed.id, { status: event.target.value })} onBlur={() => save(seed)}>
-            {Object.entries(STATUS_LABEL).map(([value, label]) => <option value={value} key={value}>{label}</option>)}
-          </select>
-        </td>
-        <td>
           <div className="seed-tree-actions">
-            <button type="button" onClick={() => plant(seed)} disabled={plantingId === seed.id || draft.status === "done" || draft.status === "archived"}>今日植える</button>
-            <button type="button" onClick={() => addTodo(draft.category, draft.section || "未分類", seed)}>子Todo追加</button>
+            <button type="button" onClick={() => addTodo(draft.category, normalizeSection(draft.section), seed)}>子Todo追加</button>
             <button type="button" onClick={() => complete(seed)} disabled={draft.status === "done"}>完了</button>
-            <button type="button" onClick={() => archive(seed)} disabled={draft.status === "archived"}>アーカイブ</button>
             <button type="button" onClick={() => remove(seed)}>削除</button>
+            <button type="button" onClick={() => plant(seed)} disabled={plantingId === seed.id || draft.status === "done"}>カレンダーに追加</button>
             {savingId === seed.id && <span>保存中</span>}
           </div>
         </td>
       </tr>,
       ...(isExpanded ? [
         <tr className="seed-note-row" key={`${seed.id}-note`}>
-          <td colSpan={7}>
+          <td colSpan={4}>
             <textarea
               value={editableNote(draft)}
               placeholder="なぜやるか、なぜ大事か、悩み、モチベーション源、手順など"
@@ -352,7 +347,7 @@ export default function Seeds() {
         <div>
           <p>種リスト</p>
           <h1>カテゴリ別ツリーTodo表</h1>
-          <span>Excelの一覧性を残しながら、カテゴリ・見出し・派生Todoで整理します。</span>
+          <span>親カテゴリ、小カテゴリ、Todo、派生Todoを軽く整理する作業台です。</span>
         </div>
         <button type="button" onClick={addCategory}>親カテゴリ追加</button>
       </section>
@@ -372,7 +367,7 @@ export default function Seeds() {
 
       <div className="seed-category-stack">
         {categories.map((category) => (
-          <section className="seed-category-panel" key={category}>
+          <section className={categoryClass(category)} key={category}>
             <header>
               <h2>{labelCategory(category)}</h2>
               <button type="button" onClick={() => addSection(category)}>小カテゴリ追加</button>
@@ -382,7 +377,7 @@ export default function Seeds() {
               const sectionSeeds = filteredSeeds
                 .filter((seed) => {
                   const draft = drafts[seed.id] ?? toPayload(seed);
-                  return draft.category === category && (draft.section || "未分類") === section && draft.parent_id == null;
+                  return draft.category === category && normalizeSection(draft.section) === section && draft.parent_id == null;
                 })
                 .sort((a, b) => ((drafts[a.id]?.sort_order ?? a.sort_order) - (drafts[b.id]?.sort_order ?? b.sort_order)) || a.id - b.id);
               const collapsed = collapsedSections.has(sectionKey);
@@ -397,6 +392,7 @@ export default function Seeds() {
                     })}>{collapsed ? "▶" : "▼"}</button>
                     <strong>{section}</strong>
                     <button type="button" onClick={() => addTodo(category, section)}>Todo追加</button>
+                    <button type="button" disabled={section === UNCATEGORIZED} onClick={() => deleteSection(category, section)}>小カテゴリ削除</button>
                   </div>
                   {!collapsed && (
                     <div className="seed-tree-table-wrap">
@@ -404,11 +400,8 @@ export default function Seeds() {
                         <thead>
                           <tr>
                             <th>優先度</th>
-                            <th>カテゴリ</th>
                             <th>内容</th>
-                            <th>所要時間</th>
                             <th>備考・悩み</th>
-                            <th>状態</th>
                             <th>操作</th>
                           </tr>
                         </thead>
@@ -416,7 +409,7 @@ export default function Seeds() {
                           {sectionSeeds.flatMap(renderTodo)}
                           {!sectionSeeds.length && (
                             <tr>
-                              <td colSpan={7} className="seed-empty-row">まだTodoがありません。</td>
+                              <td colSpan={4} className="seed-empty-row">Todoなし</td>
                             </tr>
                           )}
                         </tbody>
