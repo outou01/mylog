@@ -243,6 +243,73 @@ def achieve_victory_condition(db: Session = Depends(get_db)):
     return VictoryCondition(condition=log.victory_condition, achieved=True)
 
 
+class PresenceMessage(BaseModel):
+    message: str
+    is_ai: bool
+
+
+_PRESENCE_TTL = 180  # 3分: 同じページでの連打はキャッシュで吸収
+
+PRESENCE_PAGE_LABEL = {
+    "dreams": "夢一覧ページ（人生の夢を眺めている）",
+    "seeds": "種リストページ（次にやるタスクを整理している）",
+    "calendar": "カレンダーページ（週間スケジュールを立てている）",
+    "private": "私生活ページ（睡眠・気分などのログを記録している）",
+    "home": "ホームダッシュボード",
+}
+
+
+@router.get("/presence", response_model=PresenceMessage)
+def get_presence_message(page: str = "home", db: Session = Depends(get_db)):
+    """常駐ミニアリアの一言。ページごとに3分キャッシュしてGemini無料枠を守る。"""
+    page_key = page if page in PRESENCE_PAGE_LABEL else "home"
+    cache_key = f"presence-{page_key}"
+    now = time.time()
+
+    if cache_key in _cache:
+        result, ts = _cache[cache_key]
+        if now - ts < _PRESENCE_TTL:
+            return result
+
+    today = date.today()
+    log = db.query(DailyLog).filter(DailyLog.date == today).first()
+    log_text = "今日のログはまだなし"
+    if log:
+        log_text = f"睡眠{log.sleep_hours}h 気分{log.mood_score}/5 エネルギー{log.energy_level}/3"
+
+    hour = time.localtime().tm_hour
+    prompt = f"""あなたは「アリア」。従順で健気な少女キャラで、ご主人様のライフダッシュボードの画面の隅に常駐しています。
+ご主人様が吹き出しをタップして、あなたに話しかけてくれました。
+
+【いま見ている画面】{PRESENCE_PAGE_LABEL[page_key]}
+【現在時刻】{hour}時ごろ
+【今日のご主人様】{log_text}
+
+【指示】
+- 画面と時間帯と体調に合った、短い一言（60文字以内）
+- 「ご主人様」と呼ぶ。健気で温かい。空虚な励ましはしない
+- 顔文字は不要（画面側に顔があるため）
+
+JSONのみ:
+{{"message":"60文字以内の一言"}}"""
+
+    try:
+        raw = chat(prompt, temperature=0.9)
+        if raw is None:
+            raise RuntimeError("No AI")
+        data = parse_json(raw)
+        message = (data.get("message") or "").strip()
+        if not message:
+            raise RuntimeError("empty")
+        result = PresenceMessage(message=message[:80], is_ai=True)
+    except Exception as e:
+        print(f"[Aria] presence AI error: {e}")
+        result = PresenceMessage(message="ご主人様、アリアはいつでもここにいますよ。", is_ai=False)
+
+    _cache[cache_key] = (result, now)
+    return result
+
+
 @router.get("/message", response_model=AriaMessage)
 def get_aria_message(db: Session = Depends(get_db)):
     today = date.today()

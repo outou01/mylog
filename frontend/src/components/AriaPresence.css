@@ -30,6 +30,16 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
+.aria-presence-bubble.ai {
+  border-color: rgba(185, 226, 139, 0.5);
+  background: linear-gradient(135deg, rgba(31, 48, 38, 0.97), rgba(30, 34, 26, 0.97));
+}
+
+.aria-presence-bubble.thinking {
+  color: #b8c7b4;
+  font-style: italic;
+}
+
 .aria-presence-face {
   pointer-events: auto;
   min-width: 52px;

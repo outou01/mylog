@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
+import { fetchAriaPresence } from "../api/client";
 import "./AriaPresence.css";
 
-// APIを消費しないローカル台詞。ページと時間帯で変わる。
+// 普段表示するローカル台詞（API消費ゼロ）。タップでGeminiに話しかける。
 const PAGE_LINES: Record<string, string[]> = {
   "/dreams": [
     "夢を眺める時間も、畑仕事のうちですよ、ご主人様。",
@@ -33,6 +34,14 @@ const TIME_LINES: [number, number, string[]][] = [
 ];
 
 const FACES = ["(＾ω＾)", "(＾▽＾)", "(っ´ω`)ﾉ", "(ﾉ´∀｀)ﾉ", "(｀・ω・´)"];
+const AI_COOLDOWN_MS = 3 * 60 * 1000; // ページごとに3分に1回だけGeminiへ
+
+function pageKey(pathname: string): string {
+  for (const prefix of Object.keys(PAGE_LINES)) {
+    if (pathname.startsWith(prefix)) return prefix.slice(1);
+  }
+  return "home";
+}
 
 function pickLines(pathname: string): string[] {
   for (const [prefix, lines] of Object.entries(PAGE_LINES)) {
@@ -50,26 +59,59 @@ export default function AriaPresence() {
   const location = useLocation();
   const [index, setIndex] = useState(0);
   const [open, setOpen] = useState(true);
+  const [aiMessage, setAiMessage] = useState<string | null>(null);
+  const [thinking, setThinking] = useState(false);
+  const lastAiFetch = useRef<Record<string, number>>({});
 
   const lines = useMemo(() => pickLines(location.pathname), [location.pathname]);
   const face = useMemo(
-    () => FACES[Math.abs(location.pathname.length + index) % FACES.length],
-    [location.pathname, index],
+    () => (thinking ? "(・ω・ )?" : FACES[Math.abs(location.pathname.length + index) % FACES.length]),
+    [location.pathname, index, thinking],
   );
 
   useEffect(() => {
     setIndex(0);
     setOpen(true);
+    setAiMessage(null);
   }, [location.pathname]);
 
   // ホームには大きいアリアがいるので常駐版は出さない
   if (location.pathname === "/") return null;
 
+  const handleBubbleTap = async () => {
+    if (thinking) return;
+
+    // AIの返事を表示中、またはクールダウン中はローカル台詞をローテーション
+    const key = pageKey(location.pathname);
+    const last = lastAiFetch.current[key] ?? 0;
+    if (aiMessage || Date.now() - last < AI_COOLDOWN_MS) {
+      setAiMessage(null);
+      setIndex((i) => i + 1);
+      return;
+    }
+
+    setThinking(true);
+    try {
+      lastAiFetch.current[key] = Date.now();
+      const result = await fetchAriaPresence(key);
+      setAiMessage(result.message);
+    } catch {
+      setIndex((i) => i + 1);
+    } finally {
+      setThinking(false);
+    }
+  };
+
+  const bubbleText = thinking ? "……（考え中）" : aiMessage ?? lines[index % lines.length];
+
   return (
     <div className={`aria-presence ${open ? "open" : ""}`}>
       {open && (
-        <div className="aria-presence-bubble" onClick={() => setIndex((i) => i + 1)}>
-          {lines[index % lines.length]}
+        <div
+          className={`aria-presence-bubble ${aiMessage ? "ai" : ""} ${thinking ? "thinking" : ""}`}
+          onClick={handleBubbleTap}
+        >
+          {bubbleText}
         </div>
       )}
       <button

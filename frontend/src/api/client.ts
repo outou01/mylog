@@ -164,6 +164,14 @@ export interface AriaMessage {
 export const fetchAriaMessage = () =>
   api.get<AriaMessage>("/aria/message").then((r) => r.data);
 
+export interface AriaPresenceMessage {
+  message: string;
+  is_ai: boolean;
+}
+
+export const fetchAriaPresence = (page: string) =>
+  api.get<AriaPresenceMessage>("/aria/presence", { params: { page } }).then((r) => r.data);
+
 export interface VictoryCondition {
   condition: string;
   achieved: boolean;
