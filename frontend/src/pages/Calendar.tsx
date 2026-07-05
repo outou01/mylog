@@ -1,16 +1,10 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import {
   createScheduleBlock,
   deleteScheduleBlock,
-  fetchMonthCalendar,
-  fetchPatterns,
-  fetchWeekCompare,
   fetchWeekSchedule,
-  PatternInsight,
   ScheduleBlock,
   ScheduleBlockPayload,
-  WeekCompare,
   WeekSchedule,
   updateScheduleBlock,
 } from "../api/calendar";
@@ -18,15 +12,8 @@ import TimeAnalysis from "./TimeAnalysis";
 import "./Calendar.css";
 
 const WEEKDAYS = ["月", "火", "水", "木", "金", "土", "日"];
-const MOOD_COLOR: Record<number, string> = {
-  1: "#ef4444",
-  2: "#f97316",
-  3: "#6b7280",
-  4: "#60a5fa",
-  5: "#4ade80",
-};
 
-type Tab = "schedule" | "month" | "hours" | "patterns";
+type Tab = "schedule" | "hours";
 
 const SCHEDULE_CATEGORIES = [
   { key: "creation", label: "創作", shortLabel: "創作" },
@@ -116,7 +103,6 @@ function toPayload(block: ScheduleBlock): ScheduleBlockPayload {
 }
 
 export default function Calendar() {
-  const navigate = useNavigate();
   const today = localDate();
   const [tab, setTab] = useState<Tab>("schedule");
   const [weekStart, setWeekStart] = useState(mondayOf(today));
@@ -125,10 +111,6 @@ export default function Calendar() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [draggingId, setDraggingId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
-
-  const [monthCells, setMonthCells] = useState<any[]>([]);
-  const [compare, setCompare] = useState<WeekCompare | null>(null);
-  const [patterns, setPatterns] = useState<PatternInsight | null>(null);
 
   const weekDays = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
 
@@ -140,15 +122,6 @@ export default function Calendar() {
   useEffect(() => {
     loadSchedule();
   }, [weekStart]);
-
-  useEffect(() => {
-    if (tab === "month") {
-      const d = new Date(`${today}T00:00:00`);
-      fetchMonthCalendar(d.getFullYear(), d.getMonth() + 1).then(setMonthCells);
-      fetchWeekCompare().then(setCompare);
-    }
-    if (tab === "patterns" && !patterns) fetchPatterns().then(setPatterns);
-  }, [tab]);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -239,9 +212,7 @@ export default function Calendar() {
     <div className="calendar-page">
       <div className="cal-tabs">
         <button className={`cal-tab ${tab === "schedule" ? "active" : ""}`} onClick={() => setTab("schedule")}>週予定</button>
-        <button className={`cal-tab ${tab === "month" ? "active" : ""}`} onClick={() => setTab("month")}>月ログ</button>
         <button className={`cal-tab ${tab === "hours" ? "active" : ""}`} onClick={() => setTab("hours")}>時間</button>
-        <button className={`cal-tab ${tab === "patterns" ? "active" : ""}`} onClick={() => setTab("patterns")}>分析</button>
       </div>
 
       {tab === "schedule" && schedule && (
@@ -364,61 +335,8 @@ export default function Calendar() {
         </>
       )}
 
-      {tab === "month" && (
-        <>
-          <section className="card cal-card">
-            <h2 className="plain-title">月ログ</h2>
-            <div className="cal-grid-header">
-              {WEEKDAYS.map((d, i) => <div key={d} className={`cal-wday ${i >= 5 ? "weekend" : ""}`}>{d}</div>)}
-            </div>
-            <div className="cal-grid">
-              {monthCells.map((cell) => {
-                const d = new Date(`${cell.date}T00:00:00`);
-                const moodColor = cell.mood_score ? MOOD_COLOR[cell.mood_score] : undefined;
-                return (
-                  <button
-                    key={cell.date}
-                    className={`cal-cell ${cell.has_log ? "has-log" : ""} ${cell.date === today ? "today" : ""}`}
-                    style={moodColor && cell.has_log ? { borderColor: moodColor } : undefined}
-                    onClick={() => cell.has_log ? navigate("/logs") : navigate("/log")}
-                  >
-                    <span className="cal-day-num">{d.getDate()}</span>
-                    {cell.has_log && <span className="cal-sleep">{cell.sleep_hours}h</span>}
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-          {compare && (
-            <section className="card compare-card">
-              <h2 className="plain-title">今週 vs 先週</h2>
-              <div className="aria-compare-bubble">{compare.aria_comment}</div>
-            </section>
-          )}
-        </>
-      )}
-
       {tab === "hours" && (
         <TimeAnalysis embedded />
-      )}
-
-      {tab === "patterns" && (
-        <section className="card patterns-card">
-          <h2 className="plain-title">パターン分析</h2>
-          {patterns ? (
-            <>
-              <div className="aria-compare-bubble">{patterns.aria_comment}</div>
-              <div className="patterns-list">
-                {patterns.insights.map((insight, i) => (
-                  <div key={i} className="pattern-item">
-                    <span className="pattern-num">{i + 1}</span>
-                    <span>{insight}</span>
-                  </div>
-                ))}
-              </div>
-            </>
-          ) : <p className="no-data">読み込み中...</p>}
-        </section>
       )}
     </div>
   );
