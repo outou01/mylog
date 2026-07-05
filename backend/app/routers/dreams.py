@@ -43,12 +43,16 @@ class ProjectOut(ProjectPayload):
 class SeedPayload(BaseModel):
     title: str = Field(min_length=1, max_length=160)
     category: str = Field(max_length=40)
+    parent_id: int | None = None
     dream_id: int | None = None
     project_id: int | None = None
     priority: str | None = Field(default=None, max_length=20)
+    depth: int = Field(default=0, ge=0, le=12)
+    sort_order: int = Field(default=0, ge=0)
     section: str | None = Field(default=None, max_length=80)
     description: str | None = None
     purpose: str | None = None
+    importance: str | None = None
     concern: str | None = None
     motivation: str | None = None
     estimated_minutes: int = Field(default=30, ge=5, le=480)
@@ -113,14 +117,18 @@ def _project_out(project: DreamProject) -> ProjectOut:
 def _seed_out(seed: SeedTask) -> SeedOut:
     return SeedOut(
         id=seed.id,
+        parent_id=seed.parent_id,
         dream_id=seed.dream_id,
         project_id=seed.project_id,
         title=seed.title,
         category=seed.category,
         priority=seed.priority,
+        depth=seed.depth,
+        sort_order=seed.sort_order,
         section=seed.section,
         description=seed.description,
         purpose=seed.purpose,
+        importance=seed.importance,
         concern=seed.concern,
         motivation=seed.motivation,
         estimated_minutes=seed.estimated_minutes,
@@ -222,6 +230,7 @@ def _seed_defaults(db: Session) -> None:
                 category=dream.category,
                 section=section,
                 purpose=purpose,
+                sort_order=minutes,
                 estimated_minutes=minutes,
                 status="active",
             ))
@@ -325,7 +334,7 @@ def get_project_detail(dream_id: int, db: Session = Depends(get_db)):
     seeds = (
         db.query(SeedTask)
         .filter(SeedTask.project_id == project.id)
-        .order_by(SeedTask.section.asc(), SeedTask.id.asc())
+        .order_by(SeedTask.sort_order.asc(), SeedTask.section.asc(), SeedTask.id.asc())
         .all()
     )
     return ProjectDetailOut(dream=_dream_out(dream), project=_project_out(project), seeds=[_seed_out(seed) for seed in seeds])
@@ -349,7 +358,7 @@ def update_project(project_id: int, payload: ProjectPayload, db: Session = Depen
 @router.get("/seeds/list", response_model=list[SeedOut])
 def list_seeds(db: Session = Depends(get_db)):
     _seed_defaults(db)
-    seeds = db.query(SeedTask).order_by(SeedTask.category.asc(), SeedTask.section.asc(), SeedTask.priority.asc(), SeedTask.id.asc()).all()
+    seeds = db.query(SeedTask).order_by(SeedTask.sort_order.asc(), SeedTask.category.asc(), SeedTask.section.asc(), SeedTask.id.asc()).all()
     return [_seed_out(seed) for seed in seeds]
 
 
@@ -357,6 +366,14 @@ def list_seeds(db: Session = Depends(get_db)):
 def create_seed(payload: SeedPayload, db: Session = Depends(get_db)):
     data = payload.model_dump()
     data["category"] = _normalize_category(payload.category)
+    if data.get("parent_id"):
+        parent = db.query(SeedTask).filter(SeedTask.id == data["parent_id"]).first()
+        if not parent:
+            raise HTTPException(status_code=404, detail="Parent seed not found")
+        data["depth"] = min((parent.depth or 0) + 1, 12)
+        data["dream_id"] = data.get("dream_id") or parent.dream_id
+        data["project_id"] = data.get("project_id") or parent.project_id
+        data["category"] = data.get("category") or parent.category
     seed = SeedTask(**data)
     db.add(seed)
     db.commit()

@@ -58,8 +58,12 @@ def _migrate():
 
     seed_existing = {c["name"] for c in inspector.get_columns("seed_tasks")}
     seed_cols = [
+        ("parent_id", "INTEGER"),
         ("priority", "VARCHAR(20)"),
+        ("depth", "INTEGER DEFAULT 0"),
+        ("sort_order", "INTEGER DEFAULT 0"),
         ("concern", "TEXT"),
+        ("importance", "TEXT"),
         ("motivation", "TEXT"),
         ("actual_minutes", "INTEGER"),
         ("completed_at", "TIMESTAMP"),

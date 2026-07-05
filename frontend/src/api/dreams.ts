@@ -38,12 +38,16 @@ export interface SeedTask {
   id: number;
   title: string;
   category: string;
+  parent_id: number | null;
   dream_id: number | null;
   project_id: number | null;
   priority: string | null;
+  depth: number;
+  sort_order: number;
   section: string | null;
   description: string | null;
   purpose: string | null;
+  importance: string | null;
   concern: string | null;
   motivation: string | null;
   estimated_minutes: number;
@@ -56,12 +60,16 @@ export interface SeedTask {
 export interface SeedPayload {
   title: string;
   category: string;
+  parent_id: number | null;
   dream_id: number | null;
   project_id: number | null;
   priority: string | null;
+  depth: number;
+  sort_order: number;
   section: string | null;
   description: string | null;
   purpose: string | null;
+  importance: string | null;
   concern: string | null;
   motivation: string | null;
   estimated_minutes: number;

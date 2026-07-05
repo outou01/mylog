@@ -199,14 +199,18 @@ class SeedTask(Base):
     __tablename__ = "seed_tasks"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    parent_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("seed_tasks.id"), nullable=True, index=True)
     dream_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("dreams.id"), nullable=True, index=True)
     project_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("dream_projects.id"), nullable=True, index=True)
     title: Mapped[str] = mapped_column(String(160), nullable=False)
     category: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
     priority: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    depth: Mapped[int] = mapped_column(Integer, default=0)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
     section: Mapped[str | None] = mapped_column(String(80), nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     purpose: Mapped[str | None] = mapped_column(Text, nullable=True)
+    importance: Mapped[str | None] = mapped_column(Text, nullable=True)
     concern: Mapped[str | None] = mapped_column(Text, nullable=True)
     motivation: Mapped[str | None] = mapped_column(Text, nullable=True)
     estimated_minutes: Mapped[int] = mapped_column(Integer, default=30)

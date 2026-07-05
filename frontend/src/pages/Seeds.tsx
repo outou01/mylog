@@ -1,4 +1,4 @@
-import { Fragment, FormEvent, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   completeSeed,
   createSeed,
@@ -37,22 +37,72 @@ const TABS = [
   { key: "all", label: "すべて" },
 ];
 
-const emptySeed: SeedPayload = {
-  title: "",
-  category: "creation",
-  dream_id: null,
-  project_id: null,
+const TEXT_COLUMNS = ["description", "purpose", "importance", "concern", "motivation", "notes"] as const;
+type TextColumn = (typeof TEXT_COLUMNS)[number];
+type SeedField = keyof SeedPayload;
+type DraftMap = Record<number, SeedPayload>;
+
+const DEFAULT_WIDTHS: Record<string, number> = {
+  id: 72,
+  parent_id: 78,
+  depth: 70,
+  category: 116,
+  project: 170,
+  title: 240,
+  description: 280,
+  estimated_minutes: 92,
+  purpose: 260,
+  importance: 260,
+  concern: 220,
+  motivation: 220,
+  status: 118,
+  completed_at: 112,
+  actions: 260,
+};
+
+const emptySeed = (sortOrder: number, parent?: SeedTask): SeedPayload => ({
+  title: parent ? "派生タスク" : "新規タスク",
+  category: parent?.category ?? "creation",
+  parent_id: parent?.id ?? null,
+  dream_id: parent?.dream_id ?? null,
+  project_id: parent?.project_id ?? null,
   priority: "",
-  section: "シナリオ",
+  depth: parent ? Math.min((parent.depth ?? 0) + 1, 12) : 0,
+  sort_order: sortOrder,
+  section: parent?.section ?? "",
   description: "",
-  purpose: "",
+  purpose: parent?.purpose ?? "",
+  importance: parent?.importance ?? "",
   concern: "",
-  motivation: "",
-  estimated_minutes: 30,
+  motivation: parent?.motivation ?? "",
+  estimated_minutes: parent?.estimated_minutes ?? 30,
   actual_minutes: null,
   status: "active",
   notes: "",
-};
+});
+
+function toPayload(seed: SeedTask): SeedPayload {
+  return {
+    title: seed.title,
+    category: seed.category,
+    parent_id: seed.parent_id,
+    dream_id: seed.dream_id,
+    project_id: seed.project_id,
+    priority: seed.priority,
+    depth: seed.depth,
+    sort_order: seed.sort_order,
+    section: seed.section,
+    description: seed.description,
+    purpose: seed.purpose,
+    importance: seed.importance,
+    concern: seed.concern,
+    motivation: seed.motivation,
+    estimated_minutes: seed.estimated_minutes,
+    actual_minutes: seed.actual_minutes,
+    status: seed.status,
+    notes: seed.notes,
+  };
+}
 
 function statusClass(status: string) {
   return `seed-status ${status}`;
@@ -61,21 +111,23 @@ function statusClass(status: string) {
 export default function Seeds() {
   const [seeds, setSeeds] = useState<SeedTask[]>([]);
   const [dreams, setDreams] = useState<Dream[]>([]);
-  const [form, setForm] = useState<SeedPayload>(emptySeed);
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [plantingId, setPlantingId] = useState<number | null>(null);
-  const [expanded, setExpanded] = useState<Set<number>>(new Set());
+  const [drafts, setDrafts] = useState<DraftMap>({});
+  const [collapsed, setCollapsed] = useState<Set<number>>(new Set());
   const [message, setMessage] = useState("");
   const [tab, setTab] = useState("active");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [projectFilter, setProjectFilter] = useState("");
-  const [durationFilter, setDurationFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [keyword, setKeyword] = useState("");
+  const [editingLongText, setEditingLongText] = useState<{ id: number; field: TextColumn } | null>(null);
+  const [columnWidths, setColumnWidths] = useState(DEFAULT_WIDTHS);
+  const [savingId, setSavingId] = useState<number | null>(null);
+  const [plantingId, setPlantingId] = useState<number | null>(null);
 
   const load = async () => {
     const [seedData, dreamData] = await Promise.all([fetchSeeds(), fetchDreams()]);
     setSeeds(seedData);
+    setDrafts(Object.fromEntries(seedData.map((seed) => [seed.id, toPayload(seed)])));
     setDreams(dreamData);
   };
 
@@ -84,79 +136,135 @@ export default function Seeds() {
   }, []);
 
   const dreamById = useMemo(() => new Map(dreams.map((dream) => [dream.id, dream])), [dreams]);
+  const projectOptions = useMemo(
+    () => dreams.filter((dream) => dream.linked_project_id != null).map((dream) => ({ id: dream.linked_project_id as number, label: dream.title })),
+    [dreams],
+  );
 
   const filteredSeeds = useMemo(() => {
     const q = keyword.trim().toLowerCase();
     return seeds.filter((seed) => {
-      if (tab === "active" && !["active", "planted", "in_progress", "paused"].includes(seed.status)) return false;
-      if (tab === "candidates" && seed.status !== "active") return false;
-      if (tab === "done" && seed.status !== "done") return false;
-      if (tab === "archived" && seed.status !== "archived") return false;
-      if (categoryFilter && seed.category !== categoryFilter) return false;
-      if (projectFilter && String(seed.project_id ?? "") !== projectFilter) return false;
-      if (statusFilter && seed.status !== statusFilter) return false;
-      if (durationFilter === "short" && seed.estimated_minutes > 30) return false;
-      if (durationFilter === "medium" && (seed.estimated_minutes <= 30 || seed.estimated_minutes > 60)) return false;
-      if (durationFilter === "long" && seed.estimated_minutes <= 60) return false;
+      const draft = drafts[seed.id] ?? toPayload(seed);
+      if (tab === "active" && !["active", "planted", "in_progress", "paused"].includes(draft.status)) return false;
+      if (tab === "candidates" && draft.status !== "active") return false;
+      if (tab === "done" && draft.status !== "done") return false;
+      if (tab === "archived" && draft.status !== "archived") return false;
+      if (categoryFilter && draft.category !== categoryFilter) return false;
+      if (projectFilter && String(draft.project_id ?? "") !== projectFilter) return false;
+      if (statusFilter && draft.status !== statusFilter) return false;
       if (!q) return true;
-      const target = [
-        seed.priority,
-        seed.title,
-        seed.section,
-        seed.description,
-        seed.purpose,
-        seed.concern,
-        seed.motivation,
-        seed.notes,
-        dreamById.get(seed.dream_id ?? -1)?.title,
-      ].join(" ").toLowerCase();
-      return target.includes(q);
+      return [
+        seed.id,
+        draft.parent_id,
+        draft.priority,
+        draft.category,
+        draft.section,
+        draft.title,
+        draft.description,
+        draft.purpose,
+        draft.importance,
+        draft.concern,
+        draft.motivation,
+        draft.notes,
+        dreamById.get(draft.dream_id ?? -1)?.title,
+      ].join(" ").toLowerCase().includes(q);
     });
-  }, [categoryFilter, dreamById, durationFilter, keyword, projectFilter, seeds, statusFilter, tab]);
+  }, [categoryFilter, drafts, dreamById, keyword, projectFilter, seeds, statusFilter, tab]);
 
-  const grouped = useMemo(() => {
-    const map = new Map<string, SeedTask[]>();
+  const visibleSeeds = useMemo(() => {
+    const byParent = new Map<number | null, SeedTask[]>();
     filteredSeeds.forEach((seed) => {
-      const key = `${CATEGORY_LABEL[seed.category] ?? seed.category} / ${seed.section || "未分類"}`;
-      map.set(key, [...(map.get(key) ?? []), seed]);
+      const draft = drafts[seed.id] ?? toPayload(seed);
+      const parentId = draft.parent_id ?? null;
+      byParent.set(parentId, [...(byParent.get(parentId) ?? []), seed]);
     });
-    return Array.from(map.entries());
-  }, [filteredSeeds]);
+    byParent.forEach((items) => {
+      items.sort((a, b) => {
+        const da = drafts[a.id] ?? toPayload(a);
+        const db = drafts[b.id] ?? toPayload(b);
+        return (da.sort_order ?? 0) - (db.sort_order ?? 0) || a.id - b.id;
+      });
+    });
 
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
-    if (!form.title.trim()) return;
-    if (editingId) {
-      await updateSeed(editingId, form);
-    } else {
-      await createSeed(form);
-    }
-    setForm(emptySeed);
-    setEditingId(null);
-    await load();
+    const rows: SeedTask[] = [];
+    const visit = (parentId: number | null) => {
+      (byParent.get(parentId) ?? []).forEach((seed) => {
+        rows.push(seed);
+        if (!collapsed.has(seed.id)) visit(seed.id);
+      });
+    };
+    visit(null);
+    filteredSeeds
+      .filter((seed) => {
+        const parentId = (drafts[seed.id] ?? toPayload(seed)).parent_id;
+        return parentId != null && !filteredSeeds.some((item) => item.id === parentId) && !rows.some((item) => item.id === seed.id);
+      })
+      .forEach((seed) => rows.push(seed));
+    return rows;
+  }, [collapsed, drafts, filteredSeeds]);
+
+  const childrenByParent = useMemo(() => {
+    const map = new Map<number, number>();
+    seeds.forEach((seed) => {
+      const parentId = (drafts[seed.id] ?? toPayload(seed)).parent_id;
+      if (parentId != null) map.set(parentId, (map.get(parentId) ?? 0) + 1);
+    });
+    return map;
+  }, [drafts, seeds]);
+
+  const updateDraft = (id: number, field: SeedField, value: SeedPayload[SeedField]) => {
+    setDrafts((current) => ({ ...current, [id]: { ...current[id], [field]: value } }));
   };
 
-  const startEdit = (seed: SeedTask) => {
-    setEditingId(seed.id);
-    setForm({
-      title: seed.title,
-      category: seed.category,
-      dream_id: seed.dream_id,
-      project_id: seed.project_id,
-      priority: seed.priority,
-      section: seed.section,
-      description: seed.description,
-      purpose: seed.purpose,
-      concern: seed.concern,
-      motivation: seed.motivation,
-      estimated_minutes: seed.estimated_minutes,
-      actual_minutes: seed.actual_minutes,
-      status: seed.status,
-      notes: seed.notes,
+  const saveSeed = async (seed: SeedTask) => {
+    const draft = drafts[seed.id];
+    if (!draft || !draft.title.trim()) return;
+    setSavingId(seed.id);
+    try {
+      const saved = await updateSeed(seed.id, draft);
+      setSeeds((current) => current.map((item) => (item.id === seed.id ? saved : item)));
+      setDrafts((current) => ({ ...current, [seed.id]: toPayload(saved) }));
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  const addRow = async (parent?: SeedTask) => {
+    const nextOrder = Math.max(0, ...seeds.map((seed) => (drafts[seed.id]?.sort_order ?? seed.sort_order ?? 0))) + 10;
+    const created = await createSeed(emptySeed(nextOrder, parent));
+    setSeeds((current) => [...current, created]);
+    setDrafts((current) => ({ ...current, [created.id]: toPayload(created) }));
+    setMessage(parent ? `${parent.title} の子タスクを追加しました。` : "新規行を追加しました。");
+  };
+
+  const duplicateRow = async (seed: SeedTask) => {
+    const draft = drafts[seed.id] ?? toPayload(seed);
+    const created = await createSeed({
+      ...draft,
+      title: `${draft.title} コピー`,
+      sort_order: (draft.sort_order ?? 0) + 1,
+      status: "active",
     });
+    setSeeds((current) => [...current, created]);
+    setDrafts((current) => ({ ...current, [created.id]: toPayload(created) }));
+    setMessage("行を複製しました。");
+  };
+
+  const moveRow = async (seed: SeedTask, direction: -1 | 1) => {
+    const index = visibleSeeds.findIndex((item) => item.id === seed.id);
+    const other = visibleSeeds[index + direction];
+    if (!other) return;
+    const draft = drafts[seed.id] ?? toPayload(seed);
+    const otherDraft = drafts[other.id] ?? toPayload(other);
+    const next = { ...draft, sort_order: otherDraft.sort_order ?? 0 };
+    const nextOther = { ...otherDraft, sort_order: draft.sort_order ?? 0 };
+    const [saved, savedOther] = await Promise.all([updateSeed(seed.id, next), updateSeed(other.id, nextOther)]);
+    setSeeds((current) => current.map((item) => (item.id === saved.id ? saved : item.id === savedOther.id ? savedOther : item)));
+    setDrafts((current) => ({ ...current, [saved.id]: toPayload(saved), [savedOther.id]: toPayload(savedOther) }));
   };
 
   const plant = async (seed: SeedTask) => {
+    await saveSeed(seed);
     setPlantingId(seed.id);
     try {
       const planted = await plantSeed(seed.id);
@@ -168,62 +276,58 @@ export default function Seeds() {
   };
 
   const complete = async (seed: SeedTask) => {
-    await completeSeed(seed.id, seed.actual_minutes || seed.estimated_minutes);
-    setMessage(`${seed.title} を完了にしました。`);
-    await load();
+    const draft = drafts[seed.id] ?? toPayload(seed);
+    const saved = await completeSeed(seed.id, draft.actual_minutes || draft.estimated_minutes);
+    setSeeds((current) => current.map((item) => (item.id === seed.id ? saved : item)));
+    setDrafts((current) => ({ ...current, [seed.id]: toPayload(saved) }));
   };
 
   const archive = async (seed: SeedTask) => {
-    await updateSeed(seed.id, { ...toPayload(seed), status: "archived" });
-    await load();
+    const saved = await updateSeed(seed.id, { ...(drafts[seed.id] ?? toPayload(seed)), status: "archived" });
+    setSeeds((current) => current.map((item) => (item.id === seed.id ? saved : item)));
+    setDrafts((current) => ({ ...current, [seed.id]: toPayload(saved) }));
   };
 
-  const remove = async (id: number) => {
-    await deleteSeed(id);
-    if (editingId === id) {
-      setEditingId(null);
-      setForm(emptySeed);
-    }
-    await load();
-  };
-
-  const toggleDetail = (id: number) => {
-    setExpanded((current) => {
-      const next = new Set(current);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+  const remove = async (seed: SeedTask) => {
+    await deleteSeed(seed.id);
+    setSeeds((current) => current.filter((item) => item.id !== seed.id));
+    setDrafts((current) => {
+      const next = { ...current };
+      delete next[seed.id];
       return next;
     });
   };
 
-  const chooseDream = (dreamIdText: string) => {
-    const dreamId = dreamIdText ? Number(dreamIdText) : null;
-    const dream = dreams.find((item) => item.id === dreamId);
-    setForm({
-      ...form,
-      dream_id: dreamId,
-      project_id: dream?.linked_project_id ?? null,
-      category: dream?.category ?? form.category,
-    });
+  const resizeColumn = (key: string, startX: number) => {
+    const startWidth = columnWidths[key] ?? 140;
+    const onMove = (event: MouseEvent) => {
+      const nextWidth = Math.max(64, startWidth + event.clientX - startX);
+      setColumnWidths((current) => ({ ...current, [key]: nextWidth }));
+    };
+    const onUp = () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
   };
 
-  const projectOptions = dreams
-    .filter((dream) => dream.linked_project_id != null)
-    .map((dream) => ({ id: dream.linked_project_id as number, label: dream.title }));
+  const longTextTarget = editingLongText ? drafts[editingLongText.id] : null;
 
   return (
-    <div className="seeds-page table-mode">
-      <section className="seed-workbench-head">
+    <div className="seeds-page sheet-mode">
+      <section className="sheet-head">
         <div>
           <p>種リスト</p>
-          <h1>今日やる候補を探して、カレンダーに植える</h1>
-          <span>ExcelのTodoシートに近い、一覧性重視の作業台です。</span>
+          <h1>Excel型タスクDB</h1>
+          <span>1行ずつ直接編集して、派生タスクも同じ表の中で管理します。</span>
         </div>
+        <button type="button" onClick={() => addRow()}>新規行追加</button>
       </section>
 
       {message && <div className="plant-message">{message}</div>}
 
-      <section className="seed-toolbar">
+      <section className="sheet-toolbar">
         <div className="seed-tabs">
           {TABS.map((item) => (
             <button key={item.key} type="button" className={tab === item.key ? "active" : ""} onClick={() => setTab(item.key)}>
@@ -232,7 +336,7 @@ export default function Seeds() {
           ))}
         </div>
         <div className="seed-filters">
-          <input placeholder="キーワード" value={keyword} onChange={(event) => setKeyword(event.target.value)} />
+          <input placeholder="検索" value={keyword} onChange={(event) => setKeyword(event.target.value)} />
           <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
             <option value="">カテゴリすべて</option>
             <option value="creation">創作</option>
@@ -244,189 +348,221 @@ export default function Seeds() {
             <option value="">プロジェクトすべて</option>
             {projectOptions.map((project) => <option value={project.id} key={project.id}>{project.label}</option>)}
           </select>
-          <select value={durationFilter} onChange={(event) => setDurationFilter(event.target.value)}>
-            <option value="">所要時間すべて</option>
-            <option value="short">30分以内</option>
-            <option value="medium">31-60分</option>
-            <option value="long">61分以上</option>
-          </select>
           <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
             <option value="">状態すべて</option>
-            <option value="active">未着手</option>
-            <option value="planted">今日植えた</option>
-            <option value="in_progress">進行中</option>
-            <option value="done">完了</option>
-            <option value="archived">アーカイブ</option>
+            {Object.entries(STATUS_LABEL).map(([value, label]) => <option value={value} key={value}>{label}</option>)}
           </select>
         </div>
       </section>
 
-      <section className="seed-table-stack">
-        {grouped.map(([group, items]) => (
-          <article className="seed-table-group" key={group}>
-            <h2>{group}</h2>
-            <div className="seed-table-wrap">
-              <table className="seed-table">
-                <thead>
-                  <tr>
-                    <th>優先度</th>
-                    <th>カテゴリ</th>
-                    <th>プロジェクト</th>
-                    <th>タスク名</th>
-                    <th>内容</th>
-                    <th>所要</th>
-                    <th>備考</th>
-                    <th>状態</th>
-                    <th>操作</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {items.map((seed) => {
-                    const dream = dreamById.get(seed.dream_id ?? -1);
-                    return (
-                      <Fragment key={seed.id}>
-                        <tr>
-                          <td className="seed-priority">{seed.priority || "-"}</td>
-                          <td>{CATEGORY_LABEL[seed.category] ?? seed.category}</td>
-                          <td>{dream?.title || (seed.project_id ? `#${seed.project_id}` : "-")}</td>
-                          <td className="seed-title-cell">{seed.title}</td>
-                          <td>{seed.description || seed.purpose || "-"}</td>
-                          <td>{seed.estimated_minutes}分</td>
-                          <td>
-                            <button className="seed-link-btn" type="button" onClick={() => toggleDetail(seed.id)}>
-                              {expanded.has(seed.id) ? "閉じる" : "詳細"}
-                            </button>
-                          </td>
-                          <td><span className={statusClass(seed.status)}>{STATUS_LABEL[seed.status] ?? seed.status}</span></td>
-                          <td>
-                            <div className="seed-table-actions">
-                              <button type="button" onClick={() => plant(seed)} disabled={plantingId === seed.id || seed.status === "done" || seed.status === "archived"}>
-                                {plantingId === seed.id ? "植え中" : "今日植える"}
-                              </button>
-                              <button type="button" onClick={() => startEdit(seed)}>編集</button>
-                              <button type="button" onClick={() => complete(seed)} disabled={seed.status === "done"}>完了</button>
-                              <button type="button" onClick={() => archive(seed)} disabled={seed.status === "archived"}>アーカイブ</button>
-                              <button type="button" onClick={() => remove(seed.id)}>削除</button>
-                            </div>
-                          </td>
-                        </tr>
-                        {expanded.has(seed.id) && (
-                          <tr className="seed-detail-row">
-                            <td colSpan={9}>
-                              <div className="seed-detail-grid">
-                                <p><strong>なぜやるか</strong><span>{seed.purpose || "-"}</span></p>
-                                <p><strong>どうやるか</strong><span>{seed.description || "-"}</span></p>
-                                <p><strong>悩み</strong><span>{seed.concern || "-"}</span></p>
-                                <p><strong>モチベーション源</strong><span>{seed.motivation || "-"}</span></p>
-                                <p><strong>メモ</strong><span>{seed.notes || "-"}</span></p>
-                                <p><strong>完了</strong><span>{seed.completed_at ? `${seed.completed_at.slice(0, 10)} / ${seed.actual_minutes ?? seed.estimated_minutes}分` : "-"}</span></p>
-                              </div>
-                            </td>
-                          </tr>
-                        )}
-                      </Fragment>
-                    );
-                  })}
-                </tbody>
-              </table>
+      <section className="sheet-wrap">
+        <table className="seed-sheet" style={{ minWidth: Object.values(columnWidths).reduce((sum, width) => sum + width, 0) }}>
+          <thead>
+            <tr>
+              {[
+                ["id", "ID"],
+                ["parent_id", "親ID"],
+                ["depth", "階層"],
+                ["category", "カテゴリ"],
+                ["project", "プロジェクト"],
+                ["title", "タスク名"],
+                ["description", "内容"],
+                ["estimated_minutes", "所要"],
+                ["purpose", "なぜやるか"],
+                ["importance", "なぜ大事か"],
+                ["concern", "悩み"],
+                ["motivation", "モチベーション源"],
+                ["status", "状態"],
+                ["completed_at", "完了日"],
+                ["actions", "操作"],
+              ].map(([key, label]) => (
+                <th key={key} style={{ width: columnWidths[key] }}>
+                  {label}
+                  <span className="col-resizer" onMouseDown={(event) => resizeColumn(key, event.clientX)} />
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {visibleSeeds.map((seed) => {
+              const draft = drafts[seed.id] ?? toPayload(seed);
+              const hasChildren = (childrenByParent.get(seed.id) ?? 0) > 0;
+              const dream = dreamById.get(draft.dream_id ?? -1);
+              return (
+                <tr key={seed.id} className={draft.status === "done" ? "is-done" : ""}>
+                  <td>{seed.id}</td>
+                  <td>
+                    <input
+                      value={draft.parent_id ?? ""}
+                      onChange={(event) => updateDraft(seed.id, "parent_id", event.target.value ? Number(event.target.value) : null)}
+                      onBlur={() => saveSeed(seed)}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      value={draft.depth}
+                      type="number"
+                      min="0"
+                      max="12"
+                      onChange={(event) => updateDraft(seed.id, "depth", Number(event.target.value))}
+                      onBlur={() => saveSeed(seed)}
+                    />
+                  </td>
+                  <td>
+                    <select value={draft.category} onChange={(event) => updateDraft(seed.id, "category", event.target.value)} onBlur={() => saveSeed(seed)}>
+                      <option value="creation">創作</option>
+                      <option value="social">交流</option>
+                      <option value="job_search">転職活動</option>
+                      <option value="workout">筋トレ</option>
+                    </select>
+                  </td>
+                  <td>
+                    <select
+                      value={draft.project_id ?? ""}
+                      onChange={(event) => {
+                        const projectId = event.target.value ? Number(event.target.value) : null;
+                        const dreamOption = dreams.find((item) => item.linked_project_id === projectId);
+                        updateDraft(seed.id, "project_id", projectId);
+                        updateDraft(seed.id, "dream_id", dreamOption?.id ?? null);
+                        if (dreamOption) updateDraft(seed.id, "category", dreamOption.category);
+                      }}
+                      onBlur={() => saveSeed(seed)}
+                    >
+                      <option value="">なし</option>
+                      {projectOptions.map((project) => <option value={project.id} key={project.id}>{project.label}</option>)}
+                    </select>
+                    {dream && <small>{dream.title}</small>}
+                  </td>
+                  <td className="task-title-cell" style={{ paddingLeft: 8 + draft.depth * 18 }}>
+                    <div className="task-title-inner">
+                      <button
+                        className="tree-toggle"
+                        type="button"
+                        disabled={!hasChildren}
+                        onClick={() => setCollapsed((current) => {
+                          const next = new Set(current);
+                          if (next.has(seed.id)) next.delete(seed.id);
+                          else next.add(seed.id);
+                          return next;
+                        })}
+                      >
+                        {hasChildren ? (collapsed.has(seed.id) ? "▶" : "▼") : "・"}
+                      </button>
+                      <input value={draft.title} onChange={(event) => updateDraft(seed.id, "title", event.target.value)} onBlur={() => saveSeed(seed)} />
+                    </div>
+                  </td>
+                  <LongTextCell seed={seed} draft={draft} field="description" updateDraft={updateDraft} saveSeed={saveSeed} setEditingLongText={setEditingLongText} />
+                  <td>
+                    <input
+                      type="number"
+                      min="5"
+                      max="480"
+                      value={draft.estimated_minutes}
+                      onChange={(event) => updateDraft(seed.id, "estimated_minutes", Number(event.target.value))}
+                      onBlur={() => saveSeed(seed)}
+                    />
+                  </td>
+                  <LongTextCell seed={seed} draft={draft} field="purpose" updateDraft={updateDraft} saveSeed={saveSeed} setEditingLongText={setEditingLongText} />
+                  <LongTextCell seed={seed} draft={draft} field="importance" updateDraft={updateDraft} saveSeed={saveSeed} setEditingLongText={setEditingLongText} />
+                  <LongTextCell seed={seed} draft={draft} field="concern" updateDraft={updateDraft} saveSeed={saveSeed} setEditingLongText={setEditingLongText} />
+                  <LongTextCell seed={seed} draft={draft} field="motivation" updateDraft={updateDraft} saveSeed={saveSeed} setEditingLongText={setEditingLongText} />
+                  <td>
+                    <select value={draft.status} onChange={(event) => updateDraft(seed.id, "status", event.target.value)} onBlur={() => saveSeed(seed)}>
+                      {Object.entries(STATUS_LABEL).map(([value, label]) => <option value={value} key={value}>{label}</option>)}
+                    </select>
+                    <span className={statusClass(draft.status)}>{STATUS_LABEL[draft.status] ?? draft.status}</span>
+                  </td>
+                  <td>{seed.completed_at ? seed.completed_at.slice(0, 10) : ""}</td>
+                  <td>
+                    <div className="sheet-actions">
+                      <button type="button" onClick={() => plant(seed)} disabled={plantingId === seed.id || draft.status === "done" || draft.status === "archived"}>
+                        今日植える
+                      </button>
+                      <button type="button" onClick={() => addRow(seed)}>子追加</button>
+                      <button type="button" onClick={() => duplicateRow(seed)}>複製</button>
+                      <button type="button" onClick={() => moveRow(seed, -1)}>↑</button>
+                      <button type="button" onClick={() => moveRow(seed, 1)}>↓</button>
+                      <button type="button" onClick={() => complete(seed)} disabled={draft.status === "done"}>完了</button>
+                      <button type="button" onClick={() => archive(seed)} disabled={draft.status === "archived"}>アーカイブ</button>
+                      <button type="button" onClick={() => remove(seed)}>削除</button>
+                      {savingId === seed.id && <span>保存中</span>}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+            {!visibleSeeds.length && (
+              <tr>
+                <td colSpan={15} className="sheet-empty">条件に合う行がありません。新規行追加から作れます。</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </section>
+
+      {editingLongText && longTextTarget && (
+        <div className="sheet-modal-backdrop" onClick={() => setEditingLongText(null)}>
+          <div className="sheet-modal" onClick={(event) => event.stopPropagation()}>
+            <div>
+              <p>{longTextTarget.title}</p>
+              <h2>{longTextLabel(editingLongText.field)}</h2>
             </div>
-          </article>
-        ))}
-        {!grouped.length && <div className="seed-empty">条件に合う種はありません。</div>}
-      </section>
-
-      <form className="seed-form compact" onSubmit={submit}>
-        <p>{editingId ? "種を編集" : "種を追加"}</p>
-        <label>
-          優先度
-          <input value={form.priority ?? ""} onChange={(event) => setForm({ ...form, priority: event.target.value })} />
-        </label>
-        <label>
-          タイトル
-          <input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} />
-        </label>
-        <label>
-          夢 / プロジェクト
-          <select value={form.dream_id ?? ""} onChange={(event) => chooseDream(event.target.value)}>
-            <option value="">紐づけなし</option>
-            {dreams.map((dream) => <option value={dream.id} key={dream.id}>{dream.title}</option>)}
-          </select>
-        </label>
-        <label>
-          カテゴリ
-          <select value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })}>
-            <option value="creation">創作</option>
-            <option value="social">交流</option>
-            <option value="job_search">転職活動</option>
-            <option value="workout">筋トレ</option>
-          </select>
-        </label>
-        <label>
-          セクション
-          <input value={form.section ?? ""} onChange={(event) => setForm({ ...form, section: event.target.value })} />
-        </label>
-        <label>
-          所要分
-          <input type="number" min="5" max="480" value={form.estimated_minutes} onChange={(event) => setForm({ ...form, estimated_minutes: Number(event.target.value) })} />
-        </label>
-        <label>
-          実績分
-          <input type="number" min="0" max="1440" value={form.actual_minutes ?? ""} onChange={(event) => setForm({ ...form, actual_minutes: event.target.value ? Number(event.target.value) : null })} />
-        </label>
-        <label>
-          状態
-          <select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })}>
-            <option value="active">未着手</option>
-            <option value="planted">今日植えた</option>
-            <option value="in_progress">進行中</option>
-            <option value="done">完了</option>
-            <option value="archived">アーカイブ</option>
-          </select>
-        </label>
-        <label className="wide">
-          内容（行動主体）
-          <textarea value={form.description ?? ""} onChange={(event) => setForm({ ...form, description: event.target.value })} />
-        </label>
-        <label className="wide">
-          なぜやるか
-          <textarea value={form.purpose ?? ""} onChange={(event) => setForm({ ...form, purpose: event.target.value })} />
-        </label>
-        <label className="wide">
-          悩み
-          <textarea value={form.concern ?? ""} onChange={(event) => setForm({ ...form, concern: event.target.value })} />
-        </label>
-        <label className="wide">
-          モチベーション源
-          <textarea value={form.motivation ?? ""} onChange={(event) => setForm({ ...form, motivation: event.target.value })} />
-        </label>
-        <label className="wide">
-          メモ
-          <textarea value={form.notes ?? ""} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
-        </label>
-        <div className="dream-form-actions">
-          <button>{editingId ? "保存" : "追加"}</button>
-          {editingId && <button type="button" onClick={() => { setEditingId(null); setForm(emptySeed); }}>解除</button>}
+            <textarea
+              value={(longTextTarget[editingLongText.field] as string | null) ?? ""}
+              onChange={(event) => updateDraft(editingLongText.id, editingLongText.field, event.target.value)}
+            />
+            <div className="dream-form-actions">
+              <button type="button" onClick={async () => {
+                const seed = seeds.find((item) => item.id === editingLongText.id);
+                if (seed) await saveSeed(seed);
+                setEditingLongText(null);
+              }}>保存して閉じる</button>
+              <button type="button" onClick={() => setEditingLongText(null)}>閉じる</button>
+            </div>
+          </div>
         </div>
-      </form>
+      )}
     </div>
   );
 }
 
-function toPayload(seed: SeedTask): SeedPayload {
-  return {
-    title: seed.title,
-    category: seed.category,
-    dream_id: seed.dream_id,
-    project_id: seed.project_id,
-    priority: seed.priority,
-    section: seed.section,
-    description: seed.description,
-    purpose: seed.purpose,
-    concern: seed.concern,
-    motivation: seed.motivation,
-    estimated_minutes: seed.estimated_minutes,
-    actual_minutes: seed.actual_minutes,
-    status: seed.status,
-    notes: seed.notes,
+function LongTextCell({
+  seed,
+  draft,
+  field,
+  updateDraft,
+  saveSeed,
+  setEditingLongText,
+}: {
+  seed: SeedTask;
+  draft: SeedPayload;
+  field: TextColumn;
+  updateDraft: (id: number, field: SeedField, value: SeedPayload[SeedField]) => void;
+  saveSeed: (seed: SeedTask) => Promise<void>;
+  setEditingLongText: (value: { id: number; field: TextColumn }) => void;
+}) {
+  return (
+    <td className="long-cell">
+      <div className="long-cell-inner">
+        <textarea
+          value={(draft[field] as string | null) ?? ""}
+          onChange={(event) => updateDraft(seed.id, field, event.target.value)}
+          onBlur={() => saveSeed(seed)}
+        />
+        <button type="button" onClick={() => setEditingLongText({ id: seed.id, field })}>全文</button>
+      </div>
+    </td>
+  );
+}
+
+function longTextLabel(field: TextColumn) {
+  const labels: Record<TextColumn, string> = {
+    description: "内容",
+    purpose: "なぜやるか",
+    importance: "なぜ大事か",
+    concern: "悩み",
+    motivation: "モチベーション源",
+    notes: "メモ",
   };
+  return labels[field];
 }
