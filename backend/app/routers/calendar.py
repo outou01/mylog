@@ -79,8 +79,25 @@ class TimeAnalysisSection(BaseModel):
     categories: list[TimeCategoryTotal]
 
 
+class FieldLevel(BaseModel):
+    level: int
+    title: str
+    current_threshold_minutes: int
+    next_title: str | None = None
+    next_threshold_minutes: int | None = None
+    remaining_minutes: int | None = None
+
+
+class FieldSummary(BaseModel):
+    total_minutes: int
+    total_hours: float
+    categories: list[TimeCategoryTotal]
+    level: FieldLevel
+
+
 class TimeAnalysisOut(BaseModel):
     selected_date: str
+    field_summary: FieldSummary
     daily: TimeAnalysisSection
     weekly: TimeAnalysisSection
     monthly: TimeAnalysisSection
@@ -156,17 +173,26 @@ def _week_start(target: date) -> date:
 
 
 TIME_CATEGORIES = [
-    {"key": "creation", "label": "創作", "color": "#a970d6"},
-    {"key": "workout", "label": "筋トレ", "color": "#f9734a"},
-    {"key": "job_search", "label": "転職活動", "color": "#5d9cec"},
-    {"key": "social", "label": "交流", "color": "#58b77b"},
+    {"key": "creation", "label": "\u5275\u4f5c", "color": "#a970d6"},
+    {"key": "workout", "label": "\u7b4b\u30c8\u30ec", "color": "#f9734a"},
+    {"key": "job_search", "label": "\u8ee2\u8077\u6d3b\u52d5", "color": "#5d9cec"},
+    {"key": "social", "label": "\u4ea4\u6d41", "color": "#58b77b"},
 ]
 
 TIME_ANALYSIS_SCALES = {
     "daily": {"minutes": 8 * 60, "label": "8h"},
-    "weekly": {"minutes": 40 * 60, "label": "40h"},
-    "monthly": {"minutes": 100 * 60, "label": "100h"},
+    "weekly": {"minutes": 20 * 60, "label": "20h"},
+    "monthly": {"minutes": 80 * 60, "label": "80h"},
 }
+
+FIELD_LEVELS = [
+    (1, "\u8352\u5730", 0),
+    (2, "\u82bd\u5439\u304d", 10 * 60),
+    (3, "\u82e5\u8449", 30 * 60),
+    (4, "\u9752\u8449", 80 * 60),
+    (5, "\u8c4a\u4f5c", 150 * 60),
+    (6, "\u5927\u8fb2\u5712", 300 * 60),
+]
 
 
 def _work_blocks(start: date) -> list[ScheduleBlockOut]:
@@ -305,6 +331,49 @@ def _time_analysis_section(scope: str, label: str, start: date, end: date, db: S
     )
 
 
+def _field_level(total_minutes: int) -> FieldLevel:
+    current = FIELD_LEVELS[0]
+    next_level = None
+    for index, level in enumerate(FIELD_LEVELS):
+        if total_minutes >= level[2]:
+            current = level
+            next_level = FIELD_LEVELS[index + 1] if index + 1 < len(FIELD_LEVELS) else None
+
+    return FieldLevel(
+        level=current[0],
+        title=current[1],
+        current_threshold_minutes=current[2],
+        next_title=next_level[1] if next_level else None,
+        next_threshold_minutes=next_level[2] if next_level else None,
+        remaining_minutes=max(0, next_level[2] - total_minutes) if next_level else None,
+    )
+
+
+def _field_summary(db: Session) -> FieldSummary:
+    totals = {category["key"]: 0 for category in TIME_CATEGORIES}
+    blocks = db.query(ScheduleBlock).filter(ScheduleBlock.category.in_(totals.keys())).all()
+    for block in blocks:
+        totals[block.category] += _minutes_between(block.start_time, block.end_time)
+
+    categories = [
+        TimeCategoryTotal(
+            key=category["key"],
+            label=category["label"],
+            color=category["color"],
+            minutes=totals[category["key"]],
+            hours=round(totals[category["key"]] / 60, 1),
+        )
+        for category in TIME_CATEGORIES
+    ]
+    total_minutes = sum(totals.values())
+    return FieldSummary(
+        total_minutes=total_minutes,
+        total_hours=round(total_minutes / 60, 1),
+        categories=categories,
+        level=_field_level(total_minutes),
+    )
+
+
 def _time_range_for_scope(scope: str, selected: date) -> tuple[date, date]:
     from calendar import monthrange
 
@@ -320,36 +389,42 @@ def _time_range_for_scope(scope: str, selected: date) -> tuple[date, date]:
 
 def _fallback_time_analysis_comment(scope: str, section: TimeAnalysisSection) -> str:
     top = max(section.categories, key=lambda category: category.minutes)
+    low = min(section.categories, key=lambda category: category.minutes)
     total_hours = round(section.total_minutes / 60, 1)
+    top_hours = round(top.minutes / 60, 1)
     if section.total_minutes == 0:
-        return "まだ畑の時間は記録されていません。今日は30分だけでも、自分の時間を見える場所に置きましょう。 ※自動生成"
-    scope_label = {"daily": "今日", "weekly": "今週", "monthly": "今月"}[scope]
-    return f"{scope_label}は合計{total_hours}時間、自分の畑を耕しています。特に{top.label}が育っていますね。 ※自動生成"
+        return "今日はまだ畑に入っていません。でも、確認できたなら大丈夫です。次の一手を小さく決めましょう。"
+    if scope == "daily":
+        return f"今日は{top.label}を{top_hours:.1f}時間耕せています。少しでも手を入れたなら、畑はちゃんと前に進んでいます。"
+    if scope == "weekly":
+        return f"今週は{total_hours:.1f}時間、自分の畑に時間を使えています。特に{top.label}が伸びていますね。来週は{low.label}に15分だけ水をあげてもよさそうです。"
+    return f"今月は{total_hours:.1f}時間分、自分の未来に投資できています。完璧ではなくても、これは確かな積み上げです。"
 
 
 def _generate_time_analysis_comment(scope: str, section: TimeAnalysisSection) -> tuple[str, bool]:
     from app.ai_client import chat
 
-    scope_label = {"daily": "日次", "weekly": "週次", "monthly": "月次"}[scope]
+    scope_label = {"daily": "今日の畑", "weekly": "今週の畑", "monthly": "今月の畑"}[scope]
     category_lines = "\n".join(
         f"- {category.label}: {category.hours:.1f}h"
         for category in section.categories
     )
     prompt = f"""
 あなたはライフダッシュボードのナビゲーター「アリア」です。
-ユーザーの私生活の時間実績を見て、モチベーションが上がる短い感想を日本語で返してください。
+ユーザーが仕事だけに人生を使わず、自分の未来のために使った時間を見られるように、短い感想を日本語で返してください。
 
 対象: {scope_label}（{section.label}）
 合計: {section.total_minutes / 60:.1f}h
-カテゴリ:
+カテゴリ別:
 {category_lines}
 
 条件:
 - 2文以内
-- 説教しない
-- 仕事以外の時間を育てている実感が出る
-- 数値を1つ以上入れる
-- 引用符や箇条書きは不要
+- ユーザーを責めない
+- 積み上げた時間を肯定する
+- 足りないカテゴリは「次の一手」に変換する
+- 「自分の畑を耕している」感覚を少し出す
+- 引用符、箇条書き、説明文は不要
 """
     executor = ThreadPoolExecutor(max_workers=1)
     future = executor.submit(chat, prompt, 0.8)
@@ -368,7 +443,6 @@ def _generate_time_analysis_comment(scope: str, section: TimeAnalysisSection) ->
     if not raw:
         return _fallback_time_analysis_comment(scope, section), True
     return raw.strip().replace("\n", " ")[:180], False
-
 
 @router.post("/time-analysis/comment", response_model=TimeAnalysisCommentOut)
 def create_time_analysis_comment(payload: TimeAnalysisCommentPayload, db: Session = Depends(get_db)):
@@ -405,7 +479,7 @@ def create_time_analysis_comment(payload: TimeAnalysisCommentPayload, db: Sessio
     if payload.scope == "daily":
         label = start.strftime("%Y/%m/%d")
     elif payload.scope == "weekly":
-        label = f"{start.strftime('%Y/%m/%d')}〜{end.strftime('%m/%d')}"
+        label = f"{start.strftime('%Y/%m/%d')}\u301c{end.strftime('%m/%d')}"
     else:
         label = start.strftime("%Y/%m")
     section = _time_analysis_section(payload.scope, label, start, end, db)
@@ -438,11 +512,13 @@ def get_time_analysis(target_date: date | None = None, db: Session = Depends(get
 
     selected = target_date or date.today()
     week_start = _week_start(selected)
+    week_end = week_start + timedelta(days=6)
     month_start = selected.replace(day=1)
     month_end = selected.replace(day=monthrange(selected.year, selected.month)[1])
 
     return TimeAnalysisOut(
         selected_date=selected.isoformat(),
+        field_summary=_field_summary(db),
         daily=_time_analysis_section(
             "daily",
             selected.strftime("%Y/%m/%d"),
@@ -452,9 +528,9 @@ def get_time_analysis(target_date: date | None = None, db: Session = Depends(get
         ),
         weekly=_time_analysis_section(
             "weekly",
-            f"{week_start.strftime('%Y/%m/%d')}〜{(week_start + timedelta(days=6)).strftime('%m/%d')}",
+            f"{week_start.strftime('%Y/%m/%d')}\u301c{week_end.strftime('%m/%d')}",
             week_start,
-            week_start + timedelta(days=6),
+            week_end,
             db,
         ),
         monthly=_time_analysis_section(

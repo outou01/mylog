@@ -221,7 +221,6 @@ export default function Calendar() {
             <div className="schedule-head">
               <button className="cal-nav-btn" onClick={() => setWeekStart(addDays(weekStart, -7))}>‹</button>
               <div>
-                <p className="schedule-kicker">月曜始まり</p>
                 <h2>{displayDate(schedule.week_start)} - {displayDate(schedule.week_end)}</h2>
               </div>
               <button className="cal-nav-btn" onClick={() => setWeekStart(addDays(weekStart, 7))}>›</button>

@@ -100,8 +100,25 @@ export interface TimeAnalysisSection {
   categories: TimeCategoryTotal[];
 }
 
+export interface FieldLevel {
+  level: number;
+  title: string;
+  current_threshold_minutes: number;
+  next_title: string | null;
+  next_threshold_minutes: number | null;
+  remaining_minutes: number | null;
+}
+
+export interface FieldSummary {
+  total_minutes: number;
+  total_hours: number;
+  categories: TimeCategoryTotal[];
+  level: FieldLevel;
+}
+
 export interface TimeAnalysis {
   selected_date: string;
+  field_summary: FieldSummary;
   daily: TimeAnalysisSection;
   weekly: TimeAnalysisSection;
   monthly: TimeAnalysisSection;
