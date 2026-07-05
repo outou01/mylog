@@ -16,6 +16,7 @@ _CACHE_TTL = 300  # seconds (5分)
 
 class VictoryCondition(BaseModel):
     condition: str
+    achieved: bool = False
 
 
 class AriaMessage(BaseModel):
@@ -188,18 +189,18 @@ def get_victory_condition(db: Session = Depends(get_db)):
     cache_key = f"victory-{today.isoformat()}"
     now = time.time()
 
-    if cache_key in _cache:
-        result, ts = _cache[cache_key]
-        if now - ts < _CACHE_TTL:
-            return result
-
     from app.models import DailyLog as DL
     log = db.query(DL).filter(DL.date == today).first()
+    achieved = bool(log.victory_achieved) if log else False
+
+    if cache_key in _cache:
+        condition_text, ts = _cache[cache_key]
+        if now - ts < _CACHE_TTL:
+            return VictoryCondition(condition=condition_text, achieved=achieved)
 
     if log and log.victory_condition:
-        result = VictoryCondition(condition=log.victory_condition)
-        _cache[cache_key] = (result, now)
-        return result
+        _cache[cache_key] = (log.victory_condition, now)
+        return VictoryCondition(condition=log.victory_condition, achieved=achieved)
 
     recent_logs = (
         db.query(DL)
@@ -217,9 +218,29 @@ def get_victory_condition(db: Session = Depends(get_db)):
         log.victory_condition = condition
         db.commit()
 
-    result = VictoryCondition(condition=condition)
-    _cache[cache_key] = (result, now)
-    return result
+    _cache[cache_key] = (condition, now)
+    return VictoryCondition(condition=condition, achieved=achieved)
+
+
+@router.post("/victory-condition/achieve", response_model=VictoryCondition)
+def achieve_victory_condition(db: Session = Depends(get_db)):
+    """今日の勝利条件を達成にする。今日のログがなければ最小構成で自動作成する。"""
+    today = date.today()
+    cache_key = f"victory-{today.isoformat()}"
+
+    log = db.query(DailyLog).filter(DailyLog.date == today).first()
+    if log is None:
+        log = DailyLog(date=today, sleep_hours=7.0, mood_score=3)
+        db.add(log)
+        db.flush()
+
+    if not log.victory_condition:
+        cached = _cache.get(cache_key)
+        log.victory_condition = cached[0] if cached else "今日のログを記録する"
+
+    log.victory_achieved = True
+    db.commit()
+    return VictoryCondition(condition=log.victory_condition, achieved=True)
 
 
 @router.get("/message", response_model=AriaMessage)

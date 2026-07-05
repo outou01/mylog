@@ -1,0 +1,64 @@
+.aria-presence {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 900;
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+  pointer-events: none;
+}
+
+.aria-presence-bubble {
+  pointer-events: auto;
+  max-width: 240px;
+  padding: 0.6rem 0.85rem;
+  border: 1px solid rgba(255, 218, 160, 0.32);
+  border-radius: 12px 12px 4px 12px;
+  background: linear-gradient(135deg, rgba(35, 52, 47, 0.97), rgba(37, 31, 26, 0.97));
+  color: #f4efe5;
+  font-size: 0.84rem;
+  line-height: 1.6;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  animation: ariaPresenceIn 0.25s ease;
+  user-select: none;
+}
+
+@keyframes ariaPresenceIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.aria-presence-face {
+  pointer-events: auto;
+  min-width: 52px;
+  height: 52px;
+  padding: 0 0.5rem;
+  border: 1px solid rgba(255, 218, 160, 0.4);
+  border-radius: 50%;
+  background: rgba(10, 16, 15, 0.92);
+  color: #ffd9a3;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  transition: transform 0.15s ease;
+}
+
+.aria-presence-face:hover {
+  transform: translateY(-2px) scale(1.04);
+}
+
+@media (max-width: 560px) {
+  .aria-presence {
+    right: 10px;
+    bottom: 10px;
+  }
+
+  .aria-presence-bubble {
+    max-width: 180px;
+    font-size: 0.78rem;
+  }
+}

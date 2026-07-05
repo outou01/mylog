@@ -12,6 +12,7 @@ import MonthLog from "./pages/MonthLog";
 import PatternAnalysis from "./pages/PatternAnalysis";
 import PrivateLife from "./pages/PrivateLife";
 import Seeds from "./pages/Seeds";
+import AriaPresence from "./components/AriaPresence";
 import "./App.css";
 
 function PrivateLifeRoute({ children }: { children: ReactNode }) {
@@ -61,6 +62,7 @@ export default function App() {
           </Routes>
         </div>
       </main>
+      <AriaPresence />
     </div>
   );
 }

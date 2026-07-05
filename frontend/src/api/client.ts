@@ -164,8 +164,31 @@ export interface AriaMessage {
 export const fetchAriaMessage = () =>
   api.get<AriaMessage>("/aria/message").then((r) => r.data);
 
+export interface VictoryCondition {
+  condition: string;
+  achieved: boolean;
+}
+
 export const fetchVictoryCondition = () =>
-  api.get<{ condition: string }>("/aria/victory-condition").then((r) => r.data);
+  api.get<VictoryCondition>("/aria/victory-condition").then((r) => r.data);
+
+export const achieveVictoryCondition = () =>
+  api.post<VictoryCondition>("/aria/victory-condition/achieve").then((r) => r.data);
+
+export interface HomeSeed {
+  id: number;
+  title: string;
+  dream_title: string | null;
+  dream_icon: string | null;
+  category_label: string;
+  section: string | null;
+  purpose: string | null;
+  estimated_minutes: number;
+  status: string;
+  last_touched_label: string;
+  planted_today: boolean;
+  today_time: string | null;
+}
 
 export interface DashboardHome {
   field: {
@@ -176,29 +199,14 @@ export interface DashboardHome {
   purpose: {
     text: string;
   };
-  current_project: {
-    id: number;
-    title: string;
-    reason: string;
-    last_touched_label: string;
-    next_action: string;
-    estimated_minutes: number;
-    status: string;
-    memo: string | null;
-  };
-  projects: Array<{
-    id: number;
-    title: string;
-    reason: string;
-    last_touched_label: string;
-    next_action: string;
-    estimated_minutes: number;
-    status: string;
-    memo: string | null;
-  }>;
+  current_seed: HomeSeed | null;
+  seeds: HomeSeed[];
   life_gauge: {
     work_percent: number;
     self_percent: number;
+    work_minutes: number;
+    self_minutes: number;
+    has_data: boolean;
   };
   timeline: Array<{
     date_label: string;
@@ -217,23 +225,5 @@ export interface DashboardHome {
 export const fetchDashboardHome = () =>
   api.get<DashboardHome>("/dashboard/home").then((r) => r.data);
 
-export interface DashboardProjectPayload {
-  title: string;
-  reason: string;
-  next_action: string;
-  estimated_minutes: number;
-  memo: string | null;
-  status: string;
-}
-
 export const updateDashboardPurpose = (text: string) =>
   api.patch<{ text: string }>("/dashboard/purpose", { text }).then((r) => r.data);
-
-export const createDashboardProject = (data: DashboardProjectPayload) =>
-  api.post<DashboardHome["current_project"]>("/dashboard/projects", data).then((r) => r.data);
-
-export const updateDashboardProject = (id: number, data: DashboardProjectPayload) =>
-  api.patch<DashboardHome["current_project"]>(`/dashboard/projects/${id}`, data).then((r) => r.data);
-
-export const activateDashboardProject = (id: number) =>
-  api.post<DashboardHome["current_project"]>(`/dashboard/projects/${id}/activate`).then((r) => r.data);
