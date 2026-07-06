@@ -211,8 +211,8 @@ export default function Calendar() {
   return (
     <div className="calendar-page">
       <div className="cal-tabs">
-        <button className={`cal-tab ${tab === "schedule" ? "active" : ""}`} onClick={() => setTab("schedule")}>週予定</button>
-        <button className={`cal-tab ${tab === "hours" ? "active" : ""}`} onClick={() => setTab("hours")}>時間</button>
+        <button className={`cal-tab ${tab === "schedule" ? "active" : ""}`} onClick={() => setTab("schedule")}>🌱 今週の畑</button>
+        <button className={`cal-tab ${tab === "hours" ? "active" : ""}`} onClick={() => setTab("hours")}>🌾 畑の成長</button>
       </div>
 
       {tab === "schedule" && schedule && (
@@ -294,7 +294,7 @@ export default function Calendar() {
           </section>
 
           <form className="card schedule-form" onSubmit={submit}>
-            <p className="schedule-kicker">{editingId ? "予定を編集" : "予定を追加"}</p>
+            <p className="schedule-kicker">{editingId ? "植えたものを直す" : "畑に植える"}</p>
             <label>
               日付
               <input type="date" value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value })} />

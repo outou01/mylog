@@ -29,7 +29,7 @@ export default function App() {
             <NavLink to="/" end>ホーム</NavLink>
             <NavLink to="/dreams">夢</NavLink>
             <NavLink to="/seeds">種リスト</NavLink>
-            <NavLink to="/calendar">カレンダー</NavLink>
+            <NavLink to="/calendar">畑</NavLink>
             <NavLink to="/private">私生活</NavLink>
           </nav>
         </div>
