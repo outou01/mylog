@@ -198,7 +198,48 @@ export interface HomeSeed {
   today_time: string | null;
 }
 
+export interface SoilStatus {
+  state: "rich" | "ok" | "dry" | "unknown" | string;
+  label: string;
+  sleep_score: number;
+  mood_score: number;
+  recovery_score: number;
+  avg_sleep: number;
+  log_days: number;
+  comment: string;
+}
+
+export interface WeeklySoilReport {
+  week_start: string;
+  avg_sleep: number;
+  prev_avg_sleep: number;
+  avg_mood: number;
+  prev_avg_mood: number;
+  workout_days: number;
+  alcohol_days: number;
+  overtime_hours: number;
+  message: string;
+  is_ai: boolean;
+}
+
+export const fetchSoilStatus = () =>
+  api.get<SoilStatus>("/soil/status").then((r) => r.data);
+
+export const fetchSoilToday = () =>
+  api.get<DailyLog | null>("/soil/today").then((r) => r.data);
+
+export const logUsualDay = () =>
+  api.post<{ created: boolean; log: DailyLog }>("/soil/usual").then((r) => r.data);
+
+export const fetchWeeklySoilReport = () =>
+  api.get<WeeklySoilReport>("/soil/weekly-report").then((r) => r.data);
+
 export interface DashboardHome {
+  soil: {
+    state: string;
+    label: string;
+    comment: string;
+  };
   field: {
     weekly_minutes: number;
     progress_percent: number;

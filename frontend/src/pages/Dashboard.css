@@ -516,8 +516,30 @@
 
 .field-status-row {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
   gap: 0.75rem;
+}
+
+.field-status-link {
+  text-decoration: none;
+  border-radius: 8px;
+  padding: 0.2rem 0.4rem;
+  margin: -0.2rem -0.4rem;
+  transition: background 0.14s ease;
+}
+
+.field-status-link:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.quest-soil-hint {
+  color: #e2a55f;
+  font-size: 0.86rem;
+  margin-top: 0.7rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid rgba(226, 165, 95, 0.3);
+  border-radius: 8px;
+  background: rgba(226, 165, 95, 0.08);
 }
 
 .field-status-item {

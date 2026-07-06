@@ -163,6 +163,9 @@ export default function Dashboard() {
               {seed.planted_today && seed.today_time && <span className="planted-chip">🌱 今日 {seed.today_time}</span>}
             </div>
             {seed.purpose && <p className="quest-purpose">{seed.purpose}</p>}
+            {home.soil.state === "dry" && (
+              <p className="quest-soil-hint">🏜️ 土が乾いています。今日は10分だけでも十分です。</p>
+            )}
             <div className="quest-actions">
               {!seed.planted_today && (
                 <button className="continue-button" onClick={() => handlePlant(seed)} disabled={saving}>
@@ -213,6 +216,13 @@ export default function Dashboard() {
               <span>今週</span>
             </div>
           </div>
+          <Link to="/private/soil" className="field-status-item field-status-link">
+            <span className="field-status-icon">{home.soil.state === "rich" ? "🌱" : home.soil.state === "dry" ? "🏜️" : home.soil.state === "ok" ? "🌍" : "🌫️"}</span>
+            <div>
+              <strong>{home.soil.label}</strong>
+              <span>土壌</span>
+            </div>
+          </Link>
         </div>
         {field.next_title && field.next_remaining_minutes != null && (
           <div className="field-next">

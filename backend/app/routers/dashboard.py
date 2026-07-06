@@ -100,8 +100,15 @@ class TimelineItem(BaseModel):
     note: str | None = None
 
 
+class SoilBrief(BaseModel):
+    state: str
+    label: str
+    comment: str
+
+
 class DashboardHomeOut(BaseModel):
     field: FieldSummary
+    soil: SoilBrief
     purpose: PurposeSummary
     current_seed: CurrentSeedSummary | None
     seeds: list[CurrentSeedSummary]
@@ -481,6 +488,9 @@ def get_dashboard_home(db: Session = Depends(get_db)):
             for e in reversed(events)
         ]
 
+    from app.routers.soil import compute_soil
+    soil_status = compute_soil(db)
+
     try:
         aria = _build_aria(purpose, current_seed_row, latest_log, weekly_minutes, progress_percent)
     except Exception as exc:
@@ -488,6 +498,7 @@ def get_dashboard_home(db: Session = Depends(get_db)):
         aria = _fallback_aria(latest_log, weekly_minutes, current_seed_row)
 
     return DashboardHomeOut(
+        soil=SoilBrief(state=soil_status.state, label=soil_status.label, comment=soil_status.comment),
         field=FieldSummary(
             weekly_minutes=weekly_minutes,
             progress_percent=progress_percent,
