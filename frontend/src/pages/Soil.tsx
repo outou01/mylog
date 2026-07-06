@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   DailyLog,
+  fetchSoilAriaComment,
   fetchSoilStatus,
   fetchSoilToday,
   fetchWeeklySoilReport,
@@ -45,6 +46,10 @@ export default function Soil() {
   const [saving, setSaving] = useState(false);
   const [adjusting, setAdjusting] = useState(false);
   const [justLogged, setJustLogged] = useState(false);
+  const [ariaComment, setAriaComment] = useState<string | null>(null);
+  const [ariaThinking, setAriaThinking] = useState(false);
+  const [ariaFailed, setAriaFailed] = useState(false);
+  const lastAriaFetch = useRef(0);
 
   const load = async () => {
     const [s, t] = await Promise.all([fetchSoilStatus(), fetchSoilToday()]);
@@ -87,6 +92,30 @@ export default function Soil() {
       setReport(await fetchWeeklySoilReport());
     } finally {
       setLoadingReport(false);
+    }
+  };
+
+  const askAriaAboutSoil = async () => {
+    if (ariaThinking) return;
+    // 3分以内の再タップは無視（サーバー側も3分キャッシュ）
+    if (ariaComment && Date.now() - lastAriaFetch.current < 3 * 60 * 1000) return;
+
+    setAriaThinking(true);
+    setAriaFailed(false);
+    try {
+      const result = await fetchSoilAriaComment();
+      if (result.is_ai) {
+        setAriaComment(result.message);
+        lastAriaFetch.current = Date.now();
+      } else {
+        setAriaFailed(true);
+        setTimeout(() => setAriaFailed(false), 4000);
+      }
+    } catch {
+      setAriaFailed(true);
+      setTimeout(() => setAriaFailed(false), 4000);
+    } finally {
+      setAriaThinking(false);
     }
   };
 
@@ -194,7 +223,27 @@ export default function Soil() {
               <ScoreBar label="🛌 回復" value={status.recovery_score} />
             </div>
           )}
-          <p className="soil-comment">{status.comment}</p>
+          <div
+            className={`soil-aria-bubble ${ariaComment ? "ai" : ""} ${ariaThinking ? "thinking" : ""}`}
+            onClick={askAriaAboutSoil}
+            title="タップするとアリアが土壌を見てコメントします"
+          >
+            <span className="soil-aria-face">
+              {ariaThinking ? "(・ω・ )?" : "(＾ω＾)"} アリア
+            </span>
+            <p>
+              {ariaThinking
+                ? "……（土を観察中）"
+                : ariaFailed
+                  ? "（電波が悪いみたいです…少ししたらまたタップしてください）"
+                  : ariaComment
+                    ? `✨ ${ariaComment}`
+                    : status.comment}
+            </p>
+            {!ariaComment && !ariaThinking && !ariaFailed && (
+              <span className="soil-aria-hint">タップでアリアに聞く</span>
+            )}
+          </div>
         </section>
       )}
 

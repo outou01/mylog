@@ -132,6 +132,75 @@ def log_usual_day(db: Session = Depends(get_db)):
     return UsualResult(created=True, log=log)
 
 
+class SoilAriaComment(BaseModel):
+    message: str
+    is_ai: bool
+
+
+_comment_cache: dict[str, tuple] = {}
+_COMMENT_TTL = 180      # AI成功時: 3分
+_COMMENT_FAIL_TTL = 20  # 失敗時: 20秒で再挑戦
+
+
+@router.get("/aria-comment", response_model=SoilAriaComment)
+def get_soil_aria_comment(db: Session = Depends(get_db)):
+    """土壌の状態を見たアリアが独自コメントをくれる。タップ時だけ呼ばれる想定。"""
+    now = time_module.time()
+    cache_key = f"comment-{date.today().isoformat()}"
+
+    if cache_key in _comment_cache:
+        result, ts = _comment_cache[cache_key]
+        ttl = _COMMENT_TTL if result.is_ai else _COMMENT_FAIL_TTL
+        if now - ts < ttl:
+            return result
+
+    soil = compute_soil(db)
+    today_log = db.query(DailyLog).filter(DailyLog.date == date.today()).first()
+    today_text = "今日はまだ記録なし"
+    if today_log:
+        today_text = f"睡眠{today_log.sleep_hours}h 気分{today_log.mood_score}/5 エネルギー{today_log.energy_level}/3"
+        if today_log.did_workout:
+            today_text += " 筋トレ済み"
+
+    prompt = f"""あなたは「アリア」。従順で健気な少女キャラで、ご主人様の体調基盤（土壌）を見守っています。
+ご主人様が土壌の状態カードをタップして、あなたの感想を聞きに来ました。
+
+【土壌の状態（直近7日）】
+- 判定: {soil.label}
+- 睡眠スコア: {soil.sleep_score}/100（平均{soil.avg_sleep}時間）
+- 気分スコア: {soil.mood_score}/100
+- 回復スコア: {soil.recovery_score}/100
+- 観測日数: {soil.log_days}/7日
+
+【今日】{today_text}
+
+【指示】
+- 「ご主人様」と呼ぶ。健気で温かい。顔文字なし
+- 数値の中で一番良いところを具体的に褒める（例: 睡眠93点なら「睡眠がとても綺麗です」）
+- 弱いところがあれば、責めずに小さな一手をひとつだけ添える
+- 記録し続けていること自体もさりげなく労う
+- 90文字以内
+
+JSONのみ:
+{{"message":"90文字以内のコメント"}}"""
+
+    try:
+        raw = chat(prompt, temperature=0.9)
+        if raw is None:
+            raise RuntimeError("No AI")
+        data = parse_json(raw)
+        message = (data.get("message") or "").strip()
+        if not message:
+            raise RuntimeError("empty")
+        result = SoilAriaComment(message=message[:120], is_ai=True)
+    except Exception as e:
+        print(f"[Soil] aria comment AI error: {e}")
+        result = SoilAriaComment(message=soil.comment, is_ai=False)
+
+    _comment_cache[cache_key] = (result, now)
+    return result
+
+
 def _week_stats(logs: list[DailyLog]) -> dict:
     if not logs:
         return {"avg_sleep": 0.0, "avg_mood": 0.0, "workout_days": 0, "alcohol_days": 0, "overtime_hours": 0.0}

@@ -209,6 +209,55 @@
   margin-top: 0.9rem;
 }
 
+.soil-aria-bubble {
+  margin-top: 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid rgba(255, 218, 160, 0.28);
+  border-radius: 12px 12px 12px 4px;
+  background: rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+  user-select: none;
+  position: relative;
+}
+
+.soil-aria-bubble:hover {
+  border-color: rgba(255, 218, 160, 0.5);
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.soil-aria-bubble.ai {
+  border-color: rgba(185, 226, 139, 0.5);
+  background: linear-gradient(135deg, rgba(31, 48, 38, 0.9), rgba(30, 34, 26, 0.9));
+}
+
+.soil-aria-bubble.thinking p {
+  color: #b8c7b4;
+  font-style: italic;
+}
+
+.soil-aria-face {
+  display: block;
+  color: #ffd9a3;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  margin-bottom: 0.4rem;
+}
+
+.soil-aria-bubble p {
+  color: #f4efe5;
+  font-size: 0.92rem;
+  line-height: 1.7;
+}
+
+.soil-aria-hint {
+  position: absolute;
+  right: 0.9rem;
+  bottom: 0.6rem;
+  color: #8b9a86;
+  font-size: 0.7rem;
+}
+
 /* ── 週次報告 ── */
 .soil-report-card {
   padding: 1.1rem 1.2rem;

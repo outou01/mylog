@@ -234,6 +234,9 @@ export const logUsualDay = () =>
 export const fetchWeeklySoilReport = () =>
   api.get<WeeklySoilReport>("/soil/weekly-report").then((r) => r.data);
 
+export const fetchSoilAriaComment = () =>
+  api.get<{ message: string; is_ai: boolean }>("/soil/aria-comment").then((r) => r.data);
+
 export interface DashboardHome {
   soil: {
     state: string;
