@@ -13,6 +13,34 @@ const LEVEL_ICON: Record<number, string> = {
   1: "🟫", 2: "🌱", 3: "🌿", 4: "🍀", 5: "🌾", 6: "🏞️",
 };
 
+// 土壌の状態で変わるアリアの褒め言葉（数字はいじらない、言葉の演出だけ）
+const PRAISE_LINES: Record<string, string[]> = {
+  rich: [
+    "土が良いので作物がつやつやです✨ さすがご主人様！",
+    "肥えた畑は正直ですね。今日の実り、とても綺麗です✨",
+    "良い土に良い種、良いご主人様。完璧な収穫です✨",
+  ],
+  ok: [
+    "今日もちゃんと収穫できましたね。アリアは見てましたよ🌾",
+    "着実な畑仕事、かっこいいです。この積み重ねが大農園への道です🌾",
+    "うん、良い手つきでした。土も少しずつ肥えてきています🌾",
+  ],
+  dry: [
+    "乾いた土で耕したご主人様は、本当に立派です🏅",
+    "疲れている日の10分は、元気な日の1時間に匹敵します🏅 誇ってください",
+    "こんな日にも畑に出たこと、アリアは絶対に忘れません🏅",
+  ],
+  unknown: [
+    "見事な畑仕事でした！アリアは嬉しいです✨",
+    "今日の一歩、確かに刻まれました🌾",
+  ],
+};
+
+function pickPraise(soilState: string): string {
+  const pool = PRAISE_LINES[soilState] ?? PRAISE_LINES.unknown;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
 function ProgressBar({ value, tone = "field" }: { value: number; tone?: "field" | "work" | "self" }) {
   const safeValue = Math.max(0, Math.min(100, value));
   return (
@@ -46,7 +74,7 @@ function Foldable({ title, children, defaultOpen = false }: { title: string; chi
 export default function Dashboard() {
   const [home, setHome] = useState<DashboardHome | null>(null);
   const [error, setError] = useState(false);
-  const [celebrating, setCelebrating] = useState<string | null>(null);
+  const [celebrating, setCelebrating] = useState<{ title: string; minutes: number; praise: string } | null>(null);
   const [purposeDraft, setPurposeDraft] = useState("");
   const [editingPurpose, setEditingPurpose] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -88,7 +116,11 @@ export default function Dashboard() {
     setSaving(true);
     try {
       await completeSeed(seed.id);
-      setCelebrating(seed.title);
+      setCelebrating({
+        title: seed.title,
+        minutes: seed.estimated_minutes,
+        praise: pickPraise(home?.soil.state ?? "unknown"),
+      });
       await loadHome();
     } finally {
       setSaving(false);
@@ -131,8 +163,13 @@ export default function Dashboard() {
           <div className="victory-popup">
             <div className="victory-emoji">🎉</div>
             <div className="victory-headline">今日クリア！</div>
-            <div className="victory-cond">「{celebrating}」</div>
-            <div className="victory-sub">アリア「さすがご主人様です！ (ﾉ´∀｀)ﾉ」 — タップで閉じる</div>
+            <div className="victory-cond">「{celebrating.title}」</div>
+            <div className="victory-harvest">🌾 +{celebrating.minutes}分の収穫！</div>
+            <div className="victory-praise">
+              <span className="victory-praise-face">(ﾉ´∀｀)ﾉ アリア</span>
+              {celebrating.praise}
+            </div>
+            <div className="victory-sub">タップで閉じる</div>
           </div>
         </div>
       )}
