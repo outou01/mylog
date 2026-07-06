@@ -248,7 +248,8 @@ class PresenceMessage(BaseModel):
     is_ai: bool
 
 
-_PRESENCE_TTL = 180  # 3分: 同じページでの連打はキャッシュで吸収
+_PRESENCE_TTL = 180        # AI成功時: 3分
+_PRESENCE_FAIL_TTL = 20    # 失敗時: 20秒だけ待って再挑戦できる
 
 PRESENCE_PAGE_LABEL = {
     "dreams": "夢一覧ページ（人生の夢を眺めている）",
@@ -268,7 +269,8 @@ def get_presence_message(page: str = "home", db: Session = Depends(get_db)):
 
     if cache_key in _cache:
         result, ts = _cache[cache_key]
-        if now - ts < _PRESENCE_TTL:
+        ttl = _PRESENCE_TTL if result.is_ai else _PRESENCE_FAIL_TTL
+        if now - ts < ttl:
             return result
 
     today = date.today()

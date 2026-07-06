@@ -34,7 +34,8 @@ const TIME_LINES: [number, number, string[]][] = [
 ];
 
 const FACES = ["(＾ω＾)", "(＾▽＾)", "(っ´ω`)ﾉ", "(ﾉ´∀｀)ﾉ", "(｀・ω・´)"];
-const AI_COOLDOWN_MS = 3 * 60 * 1000; // ページごとに3分に1回だけGeminiへ
+const AI_COOLDOWN_MS = 3 * 60 * 1000;   // AI成功後は3分あける
+const FAIL_COOLDOWN_MS = 30 * 1000;     // 失敗時は30秒後に再挑戦できる
 
 function pageKey(pathname: string): string {
   for (const prefix of Object.keys(PAGE_LINES)) {
@@ -61,6 +62,7 @@ export default function AriaPresence() {
   const [open, setOpen] = useState(true);
   const [aiMessage, setAiMessage] = useState<string | null>(null);
   const [thinking, setThinking] = useState(false);
+  const [failNote, setFailNote] = useState(false);
   const lastAiFetch = useRef<Record<string, number>>({});
 
   const lines = useMemo(() => pickLines(location.pathname), [location.pathname]);
@@ -92,17 +94,33 @@ export default function AriaPresence() {
 
     setThinking(true);
     try {
-      lastAiFetch.current[key] = Date.now();
       const result = await fetchAriaPresence(key);
-      setAiMessage(result.message);
+      if (result.is_ai) {
+        lastAiFetch.current[key] = Date.now();
+        setAiMessage(result.message);
+      } else {
+        // フォールバック応答: AI扱いせず、30秒後に再挑戦できる
+        lastAiFetch.current[key] = Date.now() - AI_COOLDOWN_MS + FAIL_COOLDOWN_MS;
+        setAiMessage(null);
+        setFailNote(true);
+        setTimeout(() => setFailNote(false), 4000);
+      }
     } catch {
-      setIndex((i) => i + 1);
+      lastAiFetch.current[key] = Date.now() - AI_COOLDOWN_MS + FAIL_COOLDOWN_MS;
+      setFailNote(true);
+      setTimeout(() => setFailNote(false), 4000);
     } finally {
       setThinking(false);
     }
   };
 
-  const bubbleText = thinking ? "……（考え中）" : aiMessage ?? lines[index % lines.length];
+  const bubbleText = thinking
+    ? "……（考え中）"
+    : failNote
+      ? "（電波が悪いみたいです…30秒ほどしたらまた話しかけてください）"
+      : aiMessage
+        ? `✨ ${aiMessage}`
+        : lines[index % lines.length];
 
   return (
     <div className={`aria-presence ${open ? "open" : ""}`}>
