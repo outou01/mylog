@@ -203,6 +203,12 @@ export interface DashboardHome {
     weekly_minutes: number;
     progress_percent: number;
     message: string;
+    total_minutes: number;
+    level: number;
+    level_title: string;
+    next_title: string | null;
+    next_remaining_minutes: number | null;
+    streak_days: number;
   };
   purpose: {
     text: string;

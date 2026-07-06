@@ -23,7 +23,17 @@ router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 SELF_TARGET_MINUTES = 420
 PURPOSE_KEY = "purpose_text"
 DEFAULT_PURPOSE_TEXT = "Pythonを武器にWeb業界へ転職する。\nAIノベルゲームを完成させる。\n仕事以外の人生を作る。"
-ARIA_FALLBACK = "ご主人様、今日は30分だけ、自分の畑を耕しませんか？ (＾ω＾)"
+ARIA_FALLBACK = "ご主人様、今日は30分だけ、自分の畑を耕しませんか？"
+
+# 累計時間による畑の成長段階
+FIELD_LEVELS = [
+    (1, "荒地", 0),
+    (2, "芽吹き", 10 * 60),
+    (3, "若葉", 30 * 60),
+    (4, "青葉", 80 * 60),
+    (5, "豊作", 150 * 60),
+    (6, "大農園", 300 * 60),
+]
 ARIA_TIMEOUT_SECONDS = 6.0
 
 # 実績時間の正: 完了済みScheduleBlockのカテゴリ
@@ -42,6 +52,12 @@ class FieldSummary(BaseModel):
     weekly_minutes: int
     progress_percent: int
     message: str
+    total_minutes: int
+    level: int
+    level_title: str
+    next_title: str | None = None
+    next_remaining_minutes: int | None = None
+    streak_days: int
 
 
 class PurposeSummary(BaseModel):
@@ -165,6 +181,45 @@ def _get_purpose(db: Session) -> str:
     db.add(setting)
     db.commit()
     return setting.value
+
+
+def _field_level(total_minutes: int) -> tuple[int, str, str | None, int | None]:
+    current = FIELD_LEVELS[0]
+    next_level = None
+    for index, level in enumerate(FIELD_LEVELS):
+        if total_minutes >= level[2]:
+            current = level
+            next_level = FIELD_LEVELS[index + 1] if index + 1 < len(FIELD_LEVELS) else None
+    remaining = max(0, next_level[2] - total_minutes) if next_level else None
+    return current[0], current[1], next_level[1] if next_level else None, remaining
+
+
+def _total_self_minutes(db: Session) -> int:
+    blocks = (
+        db.query(ScheduleBlock)
+        .filter(ScheduleBlock.completed.is_(True), ScheduleBlock.category.in_(SELF_CATEGORIES))
+        .all()
+    )
+    return sum(_minutes_between(b.start_time, b.end_time) for b in blocks)
+
+
+def _streak_days(db: Session, today: date) -> int:
+    """完了した畑仕事が連続している日数。今日まだ0でも昨日から数える。"""
+    rows = (
+        db.query(ScheduleBlock.date)
+        .filter(ScheduleBlock.completed.is_(True), ScheduleBlock.category.in_(SELF_CATEGORIES))
+        .distinct()
+        .all()
+    )
+    days = {row[0] for row in rows}
+    if not days:
+        return 0
+    cursor = today if today in days else today - timedelta(days=1)
+    streak = 0
+    while cursor in days:
+        streak += 1
+        cursor -= timedelta(days=1)
+    return streak
 
 
 def _completed_self_minutes(db: Session, start: date, end: date) -> int:
@@ -299,8 +354,8 @@ def _build_aria(
 【指示】
 状況に合わせた一言（120文字以内）を返してください。疲れていそうなら休ませ、進んでいれば一緒に喜び、止まっていたら次の種を小さく示してください。
 
-JSONのみ:
-{{"face":"(＾ω＾) のような顔文字","mood":"normal/worried/proud/steady","message":"120文字以内、ご主人様呼び"}}"""
+JSONのみ（顔文字はfaceにだけ入れ、messageには入れない）:
+{{"face":"(＾ω＾) のような顔文字","mood":"normal/worried/proud/steady","message":"120文字以内、ご主人様呼び、顔文字なし"}}"""
 
     was_ai = False
     result = fallback
@@ -334,15 +389,20 @@ def get_dashboard_home(db: Session = Depends(get_db)):
     # ── 自分の畑: 完了済みScheduleBlockが唯一の実績時間 ──
     weekly_minutes = _completed_self_minutes(db, start, today)
     progress_percent = _clamp_percent((weekly_minutes / SELF_TARGET_MINUTES) * 100)
+    total_minutes = _total_self_minutes(db)
+    level, level_title, next_title, next_remaining = _field_level(total_minutes)
+    streak = _streak_days(db, today)
 
     latest_log = db.query(DailyLog).order_by(DailyLog.date.desc()).first()
     today_log = latest_log if latest_log and latest_log.date == today else None
 
     if weekly_minutes == 0:
         if today_log and today_log.energy_level == 1:
-            field_message = "今週の畑はまだ手つかずですが、疲れている日は休むのも畑仕事のうちです。"
+            field_message = "疲れている日は休むのも畑仕事のうちです。畑は逃げません。"
+        elif streak > 0:
+            field_message = f"{streak}日続いています。今日も10分だけ耕せば、途切れません。"
         else:
-            field_message = "今週はまだ畑に出ていません。10分だけ耕せば、ここに刻まれます。"
+            field_message = "10分だけ耕せば、ここに刻まれます。"
     else:
         field_message = f"今週は{_format_minutes(weekly_minutes)}、自分の畑を耕しました。"
 
@@ -432,6 +492,12 @@ def get_dashboard_home(db: Session = Depends(get_db)):
             weekly_minutes=weekly_minutes,
             progress_percent=progress_percent,
             message=field_message,
+            total_minutes=total_minutes,
+            level=level,
+            level_title=level_title,
+            next_title=next_title,
+            next_remaining_minutes=next_remaining,
+            streak_days=streak,
         ),
         purpose=PurposeSummary(text=purpose),
         current_seed=current_seed,

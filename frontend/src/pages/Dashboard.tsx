@@ -1,16 +1,17 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, ReactNode, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  achieveVictoryCondition,
   DashboardHome,
   fetchDashboardHome,
-  fetchVictoryCondition,
   HomeSeed,
   updateDashboardPurpose,
-  VictoryCondition,
 } from "../api/client";
 import { completeSeed, plantSeed } from "../api/dreams";
 import "./Dashboard.css";
+
+const LEVEL_ICON: Record<number, string> = {
+  1: "🟫", 2: "🌱", 3: "🌿", 4: "🍀", 5: "🌾", 6: "🏞️",
+};
 
 function ProgressBar({ value, tone = "field" }: { value: number; tone?: "field" | "work" | "self" }) {
   const safeValue = Math.max(0, Math.min(100, value));
@@ -29,11 +30,23 @@ function formatMinutes(minutes: number) {
   return `${hours}時間${rest}分`;
 }
 
+function Foldable({ title, children, defaultOpen = false }: { title: string; children: ReactNode; defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <section className={`home-card foldable ${open ? "open" : ""}`}>
+      <button type="button" className="foldable-head" onClick={() => setOpen((v) => !v)}>
+        <p className="eyebrow">{title}</p>
+        <span className="foldable-arrow">{open ? "▲" : "▼"}</span>
+      </button>
+      {open && <div className="foldable-body">{children}</div>}
+    </section>
+  );
+}
+
 export default function Dashboard() {
   const [home, setHome] = useState<DashboardHome | null>(null);
-  const [victory, setVictory] = useState<VictoryCondition | null>(null);
-  const [celebrating, setCelebrating] = useState(false);
   const [error, setError] = useState(false);
+  const [celebrating, setCelebrating] = useState<string | null>(null);
   const [purposeDraft, setPurposeDraft] = useState("");
   const [editingPurpose, setEditingPurpose] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -47,7 +60,6 @@ export default function Dashboard() {
 
   useEffect(() => {
     loadHome().catch(() => setError(true));
-    fetchVictoryCondition().then(setVictory).catch(() => {});
   }, []);
 
   const savePurpose = async (event: FormEvent) => {
@@ -57,17 +69,6 @@ export default function Dashboard() {
       await updateDashboardPurpose(purposeDraft);
       await loadHome();
       setEditingPurpose(false);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleAchieve = async () => {
-    setSaving(true);
-    try {
-      const result = await achieveVictoryCondition();
-      setVictory(result);
-      setCelebrating(true);
     } finally {
       setSaving(false);
     }
@@ -87,6 +88,7 @@ export default function Dashboard() {
     setSaving(true);
     try {
       await completeSeed(seed.id);
+      setCelebrating(seed.title);
       await loadHome();
     } finally {
       setSaving(false);
@@ -120,61 +122,113 @@ export default function Dashboard() {
   }
 
   const seed = home.current_seed;
+  const field = home.field;
 
   return (
-    <div className="home-shell">
-      {celebrating && victory && (
-        <div className="victory-overlay" onClick={() => setCelebrating(false)}>
+    <div className="home-shell home-shell-focus">
+      {celebrating && (
+        <div className="victory-overlay" onClick={() => setCelebrating(null)}>
           <div className="victory-popup">
             <div className="victory-emoji">🎉</div>
             <div className="victory-headline">今日クリア！</div>
-            <div className="victory-cond">「{victory.condition}」</div>
+            <div className="victory-cond">「{celebrating}」</div>
             <div className="victory-sub">アリア「さすがご主人様です！ (ﾉ´∀｀)ﾉ」 — タップで閉じる</div>
           </div>
         </div>
       )}
 
-      <section className={`home-card aria-panel aria-${home.aria.mood}`}>
-        <div className={`aria-avatar ${home.aria.mood}`}>
-          <div className="aria-face">{home.aria.face}</div>
-          <div className="aria-name">{home.aria.name}</div>
+      {/* ── 主役: アリアが今日のクエストを手渡す ── */}
+      <section className="home-card quest-hero">
+        <div className={`quest-aria aria-${home.aria.mood}`}>
+          <div className={`aria-avatar ${home.aria.mood}`}>
+            <div className="aria-face">{home.aria.face}</div>
+            <div className="aria-name">{home.aria.name}</div>
+          </div>
+          <p className="aria-line">{home.aria.message}</p>
         </div>
-        <p className="aria-line">{home.aria.message}</p>
+
+        {seed ? (
+          <div className="quest-body">
+            <p className="eyebrow">🎯 今日のクエスト</p>
+            <h1 className="quest-title">
+              {seed.dream_icon && <span className="seed-dream-icon">{seed.dream_icon}</span>}
+              {seed.title}
+            </h1>
+            <div className="continue-meta">
+              {seed.dream_title && <span>🌌 {seed.dream_title}</span>}
+              <span>{seed.category_label}</span>
+              {seed.section && <span>{seed.section}</span>}
+              <span>推定 {seed.estimated_minutes}分</span>
+              <span>最後: {seed.last_touched_label}</span>
+              {seed.planted_today && seed.today_time && <span className="planted-chip">🌱 今日 {seed.today_time}</span>}
+            </div>
+            {seed.purpose && <p className="quest-purpose">{seed.purpose}</p>}
+            <div className="quest-actions">
+              {!seed.planted_today && (
+                <button className="continue-button" onClick={() => handlePlant(seed)} disabled={saving}>
+                  🌱 今日に植える（{seed.estimated_minutes}分）
+                </button>
+              )}
+              <button
+                className={seed.planted_today ? "continue-button" : "console-button quest-done-sub"}
+                onClick={() => handleComplete(seed)}
+                disabled={saving}
+              >
+                ✅ 達成した！
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="quest-body">
+            <p className="eyebrow">🎯 今日のクエスト</p>
+            <p className="support-text">植えられる種がありません。種リストで次の一手を用意しましょう。</p>
+            <div className="quest-actions">
+              <Link to="/seeds" className="continue-button">種リストへ</Link>
+            </div>
+          </div>
+        )}
       </section>
 
-      {victory && (
-        <section className={`home-card victory-card ${victory.achieved ? "achieved" : ""}`}>
-          <div className="section-head">
-            <p className="eyebrow">🎯 今日の勝利条件</p>
-            {victory.achieved && <span className="victory-badge">クリア済み ✨</span>}
+      {/* ── 畑の様子: 累計は絶対に減らない ── */}
+      <section className="home-card field-status">
+        <div className="field-status-row">
+          <div className="field-status-item">
+            <span className="field-status-icon">{LEVEL_ICON[field.level] ?? "🌱"}</span>
+            <div>
+              <strong>Lv.{field.level} {field.level_title}</strong>
+              <span>累計 {formatMinutes(field.total_minutes)}</span>
+            </div>
           </div>
-          <p className="victory-text">「{victory.condition}」</p>
-          {!victory.achieved && (
-            <button className="console-button primary victory-achieve" onClick={handleAchieve} disabled={saving}>
-              ✅ 達成した！
-            </button>
-          )}
-        </section>
-      )}
-
-      <section className="home-card field-card">
-        <div className="card-heading">
-          <span className="card-icon">🌱</span>
-          <div>
-            <p className="eyebrow">自分の畑</p>
-            <h1>{formatMinutes(home.field.weekly_minutes)}</h1>
+          <div className="field-status-item">
+            <span className="field-status-icon">🔥</span>
+            <div>
+              <strong>{field.streak_days}日連続</strong>
+              <span>畑仕事</span>
+            </div>
+          </div>
+          <div className="field-status-item">
+            <span className="field-status-icon">⏱</span>
+            <div>
+              <strong>{formatMinutes(field.weekly_minutes)}</strong>
+              <span>今週</span>
+            </div>
           </div>
         </div>
-        <div className="progress-row">
-          <ProgressBar value={home.field.progress_percent} />
-          <span>{home.field.progress_percent}%</span>
-        </div>
-        <p className="support-text">{home.field.message}</p>
+        {field.next_title && field.next_remaining_minutes != null && (
+          <div className="field-next">
+            <ProgressBar
+              value={100 - (field.next_remaining_minutes / Math.max(1, field.next_remaining_minutes + field.total_minutes)) * 100}
+            />
+            <span>「{field.next_title}」まであと{formatMinutes(field.next_remaining_minutes)}</span>
+          </div>
+        )}
+        <p className="support-text">{field.message}</p>
       </section>
 
-      <section className="home-card purpose-card">
+      {/* ── 折りたたみ: 見たい時だけ ── */}
+      <Foldable title="🎯 総合目標">
         <div className="section-head">
-          <p className="eyebrow">🎯 総合目標</p>
+          <span />
           <button className="console-button" onClick={() => setEditingPurpose((v) => !v)}>
             {editingPurpose ? "閉じる" : "編集"}
           </button>
@@ -193,65 +247,10 @@ export default function Dashboard() {
             ))}
           </div>
         )}
-      </section>
-
-      <section className="home-card continue-card">
-        {seed ? (
-          <>
-            <div className="continue-top">
-              <div>
-                <p className="eyebrow">▶ 続きから</p>
-                <h2>
-                  {seed.dream_icon && <span className="seed-dream-icon">{seed.dream_icon}</span>}
-                  {seed.title}
-                </h2>
-              </div>
-              <span className="last-touched">最後: {seed.last_touched_label}</span>
-            </div>
-
-            <div className="continue-meta">
-              {seed.dream_title && <span>🌌 {seed.dream_title}</span>}
-              <span>{seed.category_label}</span>
-              {seed.section && <span>{seed.section}</span>}
-              <span>推定 {seed.estimated_minutes}分</span>
-              {seed.planted_today && seed.today_time && <span className="planted-chip">🌱 今日 {seed.today_time}</span>}
-            </div>
-
-            {seed.purpose && (
-              <div className="next-action-box">
-                <span>なぜやるのか</span>
-                <p>{seed.purpose}</p>
-              </div>
-            )}
-
-            <div className="continue-actions seed-actions">
-              {seed.planted_today ? (
-                <button className="continue-button" onClick={() => handleComplete(seed)} disabled={saving}>
-                  ✅ やった！（完了にする）
-                </button>
-              ) : (
-                <button className="continue-button" onClick={() => handlePlant(seed)} disabled={saving}>
-                  🌱 今日に植える（{seed.estimated_minutes}分）
-                </button>
-              )}
-              <Link to="/calendar" className="console-button">予定を見る</Link>
-              <Link to="/seeds" className="console-button">種リスト</Link>
-            </div>
-          </>
-        ) : (
-          <>
-            <p className="eyebrow">▶ 続きから</p>
-            <p className="support-text">植えられる種がありません。種リストで次の一手を用意しましょう。</p>
-            <div className="continue-actions seed-actions">
-              <Link to="/seeds" className="continue-button">種リストへ</Link>
-            </div>
-          </>
-        )}
-      </section>
+      </Foldable>
 
       {home.seeds.length > 0 && (
-        <section className="home-card project-switch-card">
-          <p className="eyebrow">他の種</p>
+        <Foldable title="🌰 他の種">
           <div className="project-list">
             {home.seeds.map((item) => (
               <div className="project-row" key={item.id}>
@@ -268,11 +267,13 @@ export default function Dashboard() {
               </div>
             ))}
           </div>
-        </section>
+          <div className="form-actions" style={{ marginTop: "0.8rem" }}>
+            <Link to="/seeds" className="console-button">種リストへ</Link>
+          </div>
+        </Foldable>
       )}
 
-      <section className="home-card life-card">
-        <p className="eyebrow">人生ゲージ（今週の実測）</p>
+      <Foldable title="⚖ 人生ゲージ（今週の実測）">
         {home.life_gauge.has_data ? (
           <div className="life-gauges">
             <div className="life-gauge-row">
@@ -293,10 +294,9 @@ export default function Dashboard() {
         ) : (
           <p className="support-text">今週の記録がまだありません。畑を耕すか、ログを書くとここに実測が出ます。</p>
         )}
-      </section>
+      </Foldable>
 
-      <section className="home-card timeline-card">
-        <p className="eyebrow">畑タイムライン</p>
+      <Foldable title="🌾 畑タイムライン">
         {home.timeline.length > 0 ? (
           <ol className="timeline-list">
             {home.timeline.map((item) => (
@@ -312,7 +312,7 @@ export default function Dashboard() {
         ) : (
           <p className="support-text">完了した畑仕事がここに刻まれていきます。</p>
         )}
-      </section>
+      </Foldable>
     </div>
   );
 }

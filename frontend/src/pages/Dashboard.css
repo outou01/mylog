@@ -447,6 +447,170 @@
   width: 58%;
 }
 
+/* ── フォーカス型レイアウト: 主役1枚＋畑の様子＋折りたたみ ── */
+.home-shell-focus {
+  grid-template-columns: minmax(0, 1fr) !important;
+  max-width: 680px;
+}
+
+.quest-hero {
+  border-color: rgba(255, 217, 163, 0.4);
+  background: linear-gradient(180deg, rgba(54, 43, 31, 0.96), rgba(20, 27, 29, 0.98));
+  padding: 0;
+  overflow: hidden;
+}
+
+.quest-aria {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.1rem 1.2rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(135deg, rgba(35, 52, 47, 0.9), rgba(37, 31, 26, 0.9));
+}
+
+.quest-body {
+  padding: 1.2rem;
+}
+
+.quest-title {
+  color: #fff5dd;
+  font-size: 1.45rem;
+  line-height: 1.4;
+  margin: 0.2rem 0 0.7rem;
+}
+
+.quest-purpose {
+  color: #c9bfa6;
+  font-size: 0.92rem;
+  line-height: 1.65;
+  margin-top: 0.8rem;
+  padding-left: 0.75rem;
+  border-left: 3px solid rgba(216, 176, 95, 0.45);
+}
+
+.quest-actions {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.6rem;
+  align-items: center;
+  margin-top: 1rem;
+}
+
+.quest-actions .continue-button {
+  margin-top: 0;
+}
+
+.quest-actions .continue-button:only-child {
+  grid-column: 1 / -1;
+}
+
+.quest-done-sub {
+  min-height: 46px;
+}
+
+.field-status {
+  padding: 1rem 1.2rem;
+}
+
+.field-status-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+}
+
+.field-status-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.field-status-icon {
+  font-size: 1.5rem;
+}
+
+.field-status-item strong {
+  display: block;
+  color: #f5eddc;
+  font-size: 1rem;
+  line-height: 1.3;
+}
+
+.field-status-item span:not(.field-status-icon) {
+  display: block;
+  color: #9aa895;
+  font-size: 0.76rem;
+}
+
+.field-next {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 0.8rem;
+  margin-top: 0.9rem;
+}
+
+.field-next span {
+  color: #cfe8c8;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.field-status .support-text {
+  margin-top: 0.7rem;
+  font-size: 0.88rem;
+}
+
+.foldable {
+  padding: 0;
+}
+
+.foldable-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 0.9rem 1.2rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+}
+
+.foldable-head .eyebrow {
+  margin-bottom: 0;
+}
+
+.foldable-arrow {
+  color: #8b9a86;
+  font-size: 0.7rem;
+}
+
+.foldable-body {
+  padding: 0 1.2rem 1.2rem;
+}
+
+@media (max-width: 560px) {
+  .field-status-row {
+    grid-template-columns: 1fr;
+    gap: 0.6rem;
+  }
+
+  .quest-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .field-next {
+    grid-template-columns: 1fr;
+    gap: 0.4rem;
+  }
+
+  .field-next span {
+    white-space: normal;
+  }
+}
+
 .victory-card {
   border-color: rgba(216, 176, 95, 0.5);
   background: linear-gradient(135deg, rgba(52, 44, 26, 0.98), rgba(24, 28, 24, 0.98));
