@@ -20,6 +20,8 @@ const SCHEDULE_CATEGORIES = [
   { key: "workout", label: "筋トレ", shortLabel: "筋トレ" },
   { key: "job_search", label: "転職活動", shortLabel: "転職" },
   { key: "social", label: "交流", shortLabel: "交流" },
+  { key: "reading", label: "読書", shortLabel: "読書" },
+  { key: "meditation", label: "瞑想", shortLabel: "瞑想" },
 ];
 
 const emptyForm: ScheduleBlockPayload = {

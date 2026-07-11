@@ -64,7 +64,7 @@
 
 .schedule-actions {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.6rem;
 }
 
@@ -99,6 +99,14 @@
 
 .quick-category.social {
   border-color: rgba(88, 183, 123, 0.34);
+}
+
+.quick-category.reading {
+  border-color: rgba(93, 156, 236, 0.34);
+}
+
+.quick-category.meditation {
+  border-color: rgba(159, 201, 216, 0.34);
 }
 
 .schedule-note {
@@ -238,6 +246,16 @@
 .schedule-block.social {
   background: rgba(58, 132, 85, 0.58);
   border-color: rgba(127, 219, 160, 0.46);
+}
+
+.schedule-block.reading {
+  background: rgba(54, 105, 170, 0.58);
+  border-color: rgba(130, 185, 245, 0.48);
+}
+
+.schedule-block.meditation {
+  background: rgba(75, 126, 145, 0.58);
+  border-color: rgba(159, 201, 216, 0.48);
 }
 
 .schedule-block.life {

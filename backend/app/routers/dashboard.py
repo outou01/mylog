@@ -37,8 +37,11 @@ FIELD_LEVELS = [
 ARIA_TIMEOUT_SECONDS = 6.0
 
 # 実績時間の正: 完了済みScheduleBlockのカテゴリ
-SELF_CATEGORIES = {"creation", "workout", "job_search", "social"}
-CATEGORY_LABEL = {"creation": "創作", "workout": "筋トレ", "job_search": "転職活動", "social": "交流"}
+SELF_CATEGORIES = {"creation", "workout", "job_search", "social", "reading", "meditation"}
+CATEGORY_LABEL = {
+    "creation": "創作", "workout": "筋トレ", "job_search": "転職活動", "social": "交流",
+    "reading": "読書", "meditation": "瞑想",
+}
 WORKDAY_MINUTES = 540  # 平日 9:30-18:30
 
 # Ariaコメントのキャッシュ（Gemini無料枠の保護）

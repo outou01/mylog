@@ -194,6 +194,8 @@ TIME_CATEGORIES = [
     {"key": "workout", "label": "\u7b4b\u30c8\u30ec", "color": "#f9734a"},
     {"key": "job_search", "label": "\u8ee2\u8077\u6d3b\u52d5", "color": "#5d9cec"},
     {"key": "social", "label": "\u4ea4\u6d41", "color": "#58b77b"},
+    {"key": "reading", "label": "\u8aad\u66f8", "color": "#72a7e8"},
+    {"key": "meditation", "label": "\u7791\u60f3", "color": "#9fc9d8"},
 ]
 
 TIME_ANALYSIS_SCALES = {

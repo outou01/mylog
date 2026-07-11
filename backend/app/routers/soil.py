@@ -303,7 +303,7 @@ CATEGORIES = [
     {"key": "knowledge", "name": "知識", "icon": "📚", "color": "#5d9cec"},
     {"key": "creation", "name": "創作", "icon": "🎨", "color": "#a970d6"},
     {"key": "mind", "name": "心", "icon": "🧘", "color": "#9fc9d8"},
-    {"key": "life", "name": "生活", "icon": "🏠", "color": "#d6b36c"},
+    {"key": "life", "name": "交流", "icon": "🤝", "color": "#58b77b"},
 ]
 CATEGORY_KEYS = {c["key"] for c in CATEGORIES}
 CATEGORY_NAME = {c["key"]: c["name"] for c in CATEGORIES}
@@ -316,14 +316,16 @@ SUGGESTIONS = {
     "knowledge": "本を10分だけ開く",
     "creation": "完成を目指さず、10分だけ続きを開く",
     "mind": "瞑想を5分する",
-    "life": "机の上だけ片付ける",
+    "life": "誰かに短い連絡を送る",
 }
 
 SCHEDULE_CATEGORY_TO_SOIL = {
     "workout": "body",
     "creation": "creation",
     "job_search": "knowledge",
-    "social": "mind",
+    "reading": "knowledge",
+    "meditation": "mind",
+    "social": "life",
     "life": "life",
     "rest": "mind",
 }
@@ -332,8 +334,8 @@ TITLE_KEYWORD_TO_SOIL = [
     ("body", ["筋トレ", "ジム", "リングフィット", "散歩", "ストレッチ", "運動"]),
     ("knowledge", ["読書", "学習", "技術", "資格", "勉強", "本"]),
     ("creation", ["創作", "小説", "シナリオ", "プロット", "開発", "ゲーム制作", "同人"]),
-    ("mind", ["瞑想", "日記", "休憩", "内省", "交流"]),
-    ("life", ["掃除", "洗濯", "片付", "準備", "就寝", "家事"]),
+    ("mind", ["瞑想", "日記", "休憩", "内省"]),
+    ("life", ["交流", "外出", "会話", "イベント", "友人"]),
 ]
 
 SCHEDULE_BASE_SCORE = {

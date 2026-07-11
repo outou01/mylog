@@ -6,6 +6,12 @@
   padding-bottom: 2rem;
 }
 
+.soil-title {
+  color: #f6eddc;
+  font-size: 1.35rem;
+  margin: 0;
+}
+
 .soil-kicker {
   color: #a7c9a2;
   font-size: 0.78rem;
