@@ -1,7 +1,7 @@
 .soil-page {
   display: grid;
   gap: 1rem;
-  max-width: 680px;
+  max-width: 920px;
   margin: 0 auto;
   padding-bottom: 2rem;
 }
@@ -330,4 +330,239 @@
   color: #8b9a86;
   font-style: normal;
   font-size: 0.76rem;
+}
+
+/* ════════ 5つの畑システム ════════ */
+
+.soil-flash {
+  position: fixed;
+  top: 70px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 950;
+  padding: 0.6rem 1.2rem;
+  border: 1px solid rgba(185, 226, 139, 0.5);
+  border-radius: 999px;
+  background: rgba(31, 48, 38, 0.97);
+  color: #d9f0c8;
+  font-size: 0.9rem;
+  font-weight: 700;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  animation: ariaPresenceIn 0.25s ease;
+}
+
+@keyframes ariaPresenceIn {
+  from { opacity: 0; transform: translate(-50%, 6px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+.soil-headline-card {
+  padding: 1.2rem 1.3rem;
+}
+
+.soil-subtitle {
+  color: #8b9a86;
+  font-size: 0.8rem;
+  margin-bottom: 0.5rem;
+}
+
+.soil-headline {
+  color: #f5eddc;
+  font-size: 1.25rem;
+  line-height: 1.5;
+}
+
+.soil-fields-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 0.9rem;
+}
+
+.soil-field-card {
+  padding: 1rem 1.1rem;
+  border-left: 4px solid var(--border);
+}
+
+.soil-overall-card {
+  border-left-color: #d6b36c;
+}
+
+.soil-field-head {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin-bottom: 0.7rem;
+}
+
+.soil-field-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  font-size: 1.3rem;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.soil-field-head strong {
+  display: block;
+  color: #f5eddc;
+  font-size: 1rem;
+}
+
+.soil-field-label {
+  display: block;
+  color: #9aa895;
+  font-size: 0.76rem;
+}
+
+.soil-field-score {
+  margin-left: auto;
+  color: #cfe8c8;
+  font-family: var(--font-mono);
+  font-size: 1.4rem;
+  font-weight: 800;
+}
+
+.soil-field-recent {
+  list-style: none;
+  margin-top: 0.7rem;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.soil-field-recent li {
+  color: #b8c7b4;
+  font-size: 0.82rem;
+}
+
+.soil-field-recent li span {
+  color: #8b9a86;
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  margin-right: 0.4rem;
+}
+
+.soil-field-empty {
+  margin-top: 0.7rem;
+  color: #7d8a78;
+  font-size: 0.8rem;
+  font-style: italic;
+}
+
+.soil-field-suggestion {
+  margin-top: 0.6rem;
+  color: #9fc9d8;
+  font-size: 0.82rem;
+  line-height: 1.6;
+}
+
+.soil-quick-card {
+  padding: 1.1rem 1.2rem;
+}
+
+.soil-quick-group {
+  margin-top: 0.7rem;
+}
+
+.soil-quick-label {
+  display: block;
+  color: #c9d4c4;
+  font-size: 0.76rem;
+  font-weight: 700;
+  margin-bottom: 0.35rem;
+}
+
+.soil-custom-toggle {
+  margin-top: 1rem;
+}
+
+.soil-custom-form {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: grid;
+  gap: 0.6rem;
+}
+
+.soil-custom-form input {
+  width: 100%;
+  border: 1px solid rgba(232, 220, 195, 0.16);
+  border-radius: 6px;
+  background: rgba(7, 12, 14, 0.64);
+  color: #f4efe5;
+  font: inherit;
+  padding: 0.6rem 0.7rem;
+}
+
+.soil-custom-form input:focus {
+  border-color: rgba(216, 176, 95, 0.72);
+  outline: none;
+}
+
+.soil-custom-actions {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+}
+
+.soil-custom-actions .soil-usual-btn {
+  margin-top: 0;
+  min-height: 42px;
+  width: auto;
+  padding: 0 1.2rem;
+}
+
+.soil-recent-card {
+  padding: 1.1rem 1.2rem;
+}
+
+.soil-recent-list {
+  list-style: none;
+  display: grid;
+  gap: 0.4rem;
+  margin-top: 0.3rem;
+}
+
+.soil-recent-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.soil-recent-date {
+  color: #8b9a86;
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  width: 44px;
+  flex-shrink: 0;
+}
+
+.soil-recent-name {
+  color: #e8e2d2;
+  font-size: 0.88rem;
+  flex: 1;
+}
+
+.soil-recent-cat {
+  color: #9aa895;
+  font-size: 0.74rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 999px;
+  padding: 0.15rem 0.55rem;
+}
+
+.soil-recent-delete {
+  background: none;
+  border: none;
+  color: #7d8a78;
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 0 0.3rem;
+}
+
+.soil-recent-delete:hover {
+  color: #ef7070;
 }

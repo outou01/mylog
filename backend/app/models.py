@@ -247,3 +247,34 @@ class TimeAnalysisComment(Base):
     is_fallback: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+class SoilActionDefinition(Base):
+    __tablename__ = "soil_action_definitions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    category_key: Mapped[str] = mapped_column(String(20), nullable=False, index=True)  # body/knowledge/creation/mind/life
+    base_score: Mapped[int] = mapped_column(Integer, default=10)
+    default_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    icon: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    is_quick: Mapped[bool] = mapped_column(Boolean, default=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+class SoilActionLog(Base):
+    __tablename__ = "soil_action_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    action_definition_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("soil_action_definitions.id"), nullable=True, index=True)
+    action_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    category_key: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    performed_on: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    duration_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    source_type: Mapped[str] = mapped_column(String(20), default="manual")
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())

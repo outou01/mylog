@@ -237,6 +237,63 @@ export const fetchWeeklySoilReport = () =>
 export const fetchSoilAriaComment = () =>
   api.get<{ message: string; is_ai: boolean }>("/soil/aria-comment").then((r) => r.data);
 
+export interface SoilActionDef {
+  id: number;
+  name: string;
+  category_key: string;
+  base_score: number;
+  default_minutes: number | null;
+  icon: string | null;
+  is_quick: boolean;
+}
+
+export interface SoilLogEntry {
+  id: number;
+  action_name: string;
+  category_key: string;
+  category_name: string;
+  performed_on: string;
+  date_label: string;
+  duration_minutes: number | null;
+}
+
+export interface SoilFieldCard {
+  key: string;
+  name: string;
+  icon: string;
+  color: string;
+  score: number;
+  label: string;
+  recent: Array<{ date_label: string; name: string; duration_minutes: number | null }>;
+  suggestion: string;
+}
+
+export interface SoilSummary {
+  headline: string;
+  overall_score: number;
+  overall_note: string;
+  categories: SoilFieldCard[];
+  recent_logs: SoilLogEntry[];
+  aria_message: string;
+}
+
+export const fetchSoilSummary = () =>
+  api.get<SoilSummary>("/soil/summary").then((r) => r.data);
+
+export const fetchSoilActions = () =>
+  api.get<SoilActionDef[]>("/soil/actions").then((r) => r.data);
+
+export const createSoilLog = (data: {
+  action_definition_id?: number;
+  action_name?: string;
+  category_key?: string;
+  duration_minutes?: number;
+  performed_on?: string;
+}) => api.post<SoilLogEntry>("/soil/logs", data).then((r) => r.data);
+
+export const deleteSoilLog = (id: number) =>
+  api.delete(`/soil/logs/${id}`).then((r) => r.data);
+
 export interface DashboardHome {
   soil: {
     state: string;

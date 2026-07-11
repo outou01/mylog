@@ -17,7 +17,7 @@ export default function PrivateLife({ children }: { children: React.ReactNode })
       <section className="private-life-head">
         <div>
           <p>土壌</p>
-          <h1>体調は、すべての土台</h1>
+          <h1>自分の畑を、毎日少しずつ耕す</h1>
         </div>
       </section>
 

@@ -154,31 +154,27 @@ def get_soil_aria_comment(db: Session = Depends(get_db)):
         if now - ts < ttl:
             return result
 
-    soil = compute_soil(db)
-    today_log = db.query(DailyLog).filter(DailyLog.date == date.today()).first()
-    today_text = "今日はまだ記録なし"
-    if today_log:
-        today_text = f"睡眠{today_log.sleep_hours}h 気分{today_log.mood_score}/5 エネルギー{today_log.energy_level}/3"
-        if today_log.did_workout:
-            today_text += " 筋トレ済み"
+    scores, by_category = _compute_field_scores(db)
+    score_lines = []
+    for c in CATEGORIES:
+        recent = by_category[c["key"]][:2]
+        recent_text = "、".join(
+            f"{_date_label(l.performed_on)}に{l.action_name}" for l in recent
+        ) or "行動なし"
+        score_lines.append(f"- {c['name']}: {scores[c['key']]}/100（{recent_text}）")
 
-    prompt = f"""あなたは「アリア」。従順で健気な少女キャラで、ご主人様の体調基盤（土壌）を見守っています。
-ご主人様が土壌の状態カードをタップして、あなたの感想を聞きに来ました。
+    prompt = f"""あなたは「アリア」。従順で健気な少女キャラで、ご主人様の「自分の畑」を見守っています。
+ご主人様が畑の様子をタップして、あなたの感想を聞きに来ました。
 
-【土壌の状態（直近7日）】
-- 判定: {soil.label}
-- 睡眠スコア: {soil.sleep_score}/100（平均{soil.avg_sleep}時間）
-- 気分スコア: {soil.mood_score}/100
-- 回復スコア: {soil.recovery_score}/100
-- 観測日数: {soil.log_days}/7日
-
-【今日】{today_text}
+【5つの畑（直近7日の行動から算出）】
+{chr(10).join(score_lines)}
 
 【指示】
 - 「ご主人様」と呼ぶ。健気で温かい。顔文字なし
-- 数値の中で一番良いところを具体的に褒める（例: 睡眠93点なら「睡眠がとても綺麗です」）
-- 弱いところがあれば、責めずに小さな一手をひとつだけ添える
-- 記録し続けていること自体もさりげなく労う
+- 一番育っている畑を、実際の行動名を挙げて具体的に褒める
+- 乾いている畑があれば、責めずに5〜10分の小さな一手をひとつだけ添える
+- 「全部やりましょう」は禁止。提案は必ず一つだけ
+- 数値の読み上げだけで終わらせない
 - 90文字以内
 
 JSONのみ:
@@ -195,7 +191,7 @@ JSONのみ:
         result = SoilAriaComment(message=message[:120], is_ai=True)
     except Exception as e:
         print(f"[Soil] aria comment AI error: {e}")
-        result = SoilAriaComment(message=soil.comment, is_ai=False)
+        result = SoilAriaComment(message=_rule_based_aria(scores), is_ai=False)
 
     _comment_cache[cache_key] = (result, now)
     return result
@@ -294,3 +290,326 @@ JSONのみ:
 
     _report_cache[cache_key] = (message, is_ai, now)
     return WeeklySoilReport(**base, message=message[:300], is_ai=is_ai)
+
+
+# ════════════════════════════════════════════════════════════════
+# 5つの畑システム — 状態ではなく行動を記録する
+# ════════════════════════════════════════════════════════════════
+
+from app.models import SoilActionDefinition, SoilActionLog
+
+CATEGORIES = [
+    {"key": "body", "name": "身体", "icon": "💪", "color": "#f9734a"},
+    {"key": "knowledge", "name": "知識", "icon": "📚", "color": "#5d9cec"},
+    {"key": "creation", "name": "創作", "icon": "🎨", "color": "#a970d6"},
+    {"key": "mind", "name": "心", "icon": "🧘", "color": "#9fc9d8"},
+    {"key": "life", "name": "生活", "icon": "🏠", "color": "#d6b36c"},
+]
+CATEGORY_KEYS = {c["key"] for c in CATEGORIES}
+CATEGORY_NAME = {c["key"]: c["name"] for c in CATEGORIES}
+
+RECENCY = [1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4]
+DAILY_CATEGORY_CAP = 60  # 1日1カテゴリの生スコア上限（連打対策）
+
+SUGGESTIONS = {
+    "body": "軽いストレッチを5分する",
+    "knowledge": "本を10分だけ開く",
+    "creation": "完成を目指さず、10分だけ続きを開く",
+    "mind": "瞑想を5分する",
+    "life": "机の上だけ片付ける",
+}
+
+DEFAULT_ACTIONS = [
+    # (name, category, base_score, default_minutes, icon, sort)
+    ("ジム", "body", 45, 60, "🏋️", 1),
+    ("リングフィット", "body", 30, 35, "🎮", 2),
+    ("自宅筋トレ", "body", 25, 20, "💪", 3),
+    ("散歩", "body", 15, 30, "🚶", 4),
+    ("ストレッチ", "body", 8, 5, "🤸", 5),
+    ("読書", "knowledge", 15, 15, "📖", 1),
+    ("技術学習", "knowledge", 25, 30, "💻", 2),
+    ("資格勉強", "knowledge", 25, 30, "📝", 3),
+    ("小説を書く", "creation", 25, 30, "✍️", 1),
+    ("プロット作成", "creation", 20, 30, "🗂️", 2),
+    ("ダッシュボード開発", "creation", 25, 30, "🛠️", 3),
+    ("瞑想", "mind", 15, 5, "🧘", 1),
+    ("日記", "mind", 10, 10, "📓", 2),
+    ("デジタル休憩", "mind", 15, 30, "🌿", 3),
+    ("掃除", "life", 15, 15, "🧹", 1),
+    ("洗濯", "life", 10, None, "🧺", 2),
+    ("片付け", "life", 15, 15, "📦", 3),
+    ("早めの就寝", "life", 15, None, "🌙", 4),
+    ("明日の準備", "life", 10, 10, "🎒", 5),
+]
+
+
+class SoilActionDefOut(BaseModel):
+    id: int
+    name: str
+    category_key: str
+    base_score: int
+    default_minutes: int | None
+    icon: str | None
+    is_quick: bool
+
+
+class SoilLogCreate(BaseModel):
+    action_definition_id: int | None = None
+    action_name: str | None = None
+    category_key: str | None = None
+    performed_on: date | None = None
+    duration_minutes: int | None = None
+    note: str | None = None
+
+
+class SoilLogOut(BaseModel):
+    id: int
+    action_name: str
+    category_key: str
+    category_name: str
+    performed_on: str
+    date_label: str
+    duration_minutes: int | None
+
+
+class RecentAction(BaseModel):
+    date_label: str
+    name: str
+    duration_minutes: int | None
+
+
+class FieldCard(BaseModel):
+    key: str
+    name: str
+    icon: str
+    color: str
+    score: int
+    label: str
+    recent: list[RecentAction]
+    suggestion: str
+
+
+class SoilSummary(BaseModel):
+    headline: str
+    overall_score: int
+    overall_note: str
+    categories: list[FieldCard]
+    recent_logs: list[SoilLogOut]
+    aria_message: str
+
+
+def _seed_action_defs(db: Session) -> None:
+    if db.query(SoilActionDefinition).count() > 0:
+        return
+    for name, cat, score, minutes, icon, sort in DEFAULT_ACTIONS:
+        db.add(SoilActionDefinition(
+            name=name, category_key=cat, base_score=score,
+            default_minutes=minutes, icon=icon, sort_order=sort,
+        ))
+    db.commit()
+
+
+def _score_label(score: int) -> str:
+    if score >= 80:
+        return "よく育っている"
+    if score >= 60:
+        return "安定している"
+    if score >= 40:
+        return "芽が出ている"
+    if score >= 20:
+        return "少し乾いている"
+    return "水を待っている"
+
+
+def _date_label(d: date) -> str:
+    today = date.today()
+    if d == today:
+        return "今日"
+    if d == today - timedelta(days=1):
+        return "昨日"
+    return f"{d.month}/{d.day}"
+
+
+def _log_out(log: SoilActionLog) -> SoilLogOut:
+    return SoilLogOut(
+        id=log.id,
+        action_name=log.action_name,
+        category_key=log.category_key,
+        category_name=CATEGORY_NAME.get(log.category_key, log.category_key),
+        performed_on=log.performed_on.isoformat(),
+        date_label=_date_label(log.performed_on),
+        duration_minutes=log.duration_minutes,
+    )
+
+
+def _compute_field_scores(db: Session) -> tuple[dict[str, int], dict[str, list[SoilActionLog]]]:
+    today = date.today()
+    start = today - timedelta(days=6)
+    logs = (
+        db.query(SoilActionLog)
+        .filter(SoilActionLog.performed_on >= start, SoilActionLog.performed_on <= today)
+        .order_by(SoilActionLog.performed_on.desc(), SoilActionLog.id.desc())
+        .all()
+    )
+    defs = {d.id: d for d in db.query(SoilActionDefinition).all()}
+
+    # (category, day) ごとの生スコアを集め、日次上限をかけてから新しさ係数を掛ける
+    day_raw: dict[tuple[str, date], float] = {}
+    by_category: dict[str, list[SoilActionLog]] = {c["key"]: [] for c in CATEGORIES}
+    for log in logs:
+        if log.category_key not in CATEGORY_KEYS:
+            continue
+        by_category[log.category_key].append(log)
+        definition = defs.get(log.action_definition_id) if log.action_definition_id else None
+        base = definition.base_score if definition else 12
+        default_min = definition.default_minutes if definition else None
+        if log.duration_minutes and default_min:
+            factor = max(0.3, min(2.0, log.duration_minutes / default_min))
+        else:
+            factor = 1.0
+        key = (log.category_key, log.performed_on)
+        day_raw[key] = day_raw.get(key, 0.0) + base * factor
+
+    scores: dict[str, float] = {c["key"]: 0.0 for c in CATEGORIES}
+    for (cat, day), raw in day_raw.items():
+        age = (today - day).days
+        recency = RECENCY[age] if 0 <= age < len(RECENCY) else 0.0
+        scores[cat] += min(raw, DAILY_CATEGORY_CAP) * recency
+
+    return {k: min(100, round(v)) for k, v in scores.items()}, by_category
+
+
+def _build_headline(scores: dict[str, int]) -> tuple[str, str]:
+    """(今日の一言, 全体ノート) をルールベースで作る。責めない。"""
+    vals = list(scores.values())
+    best_key = max(scores, key=lambda k: scores[k])
+    worst_key = min(scores, key=lambda k: scores[k])
+    best, worst = CATEGORY_NAME[best_key], CATEGORY_NAME[worst_key]
+
+    if all(v == 0 for v in vals):
+        return (
+            "今日、自分の畑を5分だけ耕そう。",
+            "まだ記録がありません。まずは一つ登録して、最初の芽を育てましょう。",
+        )
+    if all(v >= 60 for v in vals):
+        return (
+            "今週は全体的によく耕せています。今日は休むことも畑を守る行動です。",
+            f"どの畑もよく育っています。{best}は特に元気です。",
+        )
+    if scores[worst_key] < 20:
+        return (
+            f"{best}の畑がよく育っています。{worst}に少し水をあげると、全体が整いそうです。",
+            f"今日のおすすめ: {SUGGESTIONS[worst_key]}",
+        )
+    return (
+        f"{best}の畑が育っています。今日も5分だけ、どこかを耕しましょう。",
+        f"{worst}の畑にも少し触れると、バランスが良くなります。",
+    )
+
+
+def _rule_based_aria(scores: dict[str, int]) -> str:
+    vals = list(scores.values())
+    best_key = max(scores, key=lambda k: scores[k])
+    worst_key = min(scores, key=lambda k: scores[k])
+    if all(v == 0 for v in vals):
+        return "ご主人様、最初の一粒からで大丈夫です。今日やったことを一つだけ、教えてください。"
+    if all(v >= 60 for v in vals):
+        return "ご主人様、今週は自分の畑をよく育てられています。今日は無理に増やさず、この流れを守りましょう。"
+    if scores[worst_key] < 20:
+        return f"ご主人様、{CATEGORY_NAME[best_key]}の畑がよく育っています。{CATEGORY_NAME[worst_key]}は{SUGGESTIONS[worst_key]}だけで十分ですよ。"
+    return f"ご主人様、{CATEGORY_NAME[best_key]}が順調です。焦らず、今日の一粒を選びましょう。"
+
+
+@router.get("/summary", response_model=SoilSummary)
+def get_soil_summary(db: Session = Depends(get_db)):
+    _seed_action_defs(db)
+    scores, by_category = _compute_field_scores(db)
+
+    cards = []
+    for c in CATEGORIES:
+        cat_logs = by_category[c["key"]][:2]
+        cards.append(FieldCard(
+            key=c["key"], name=c["name"], icon=c["icon"], color=c["color"],
+            score=scores[c["key"]],
+            label=_score_label(scores[c["key"]]),
+            recent=[RecentAction(
+                date_label=_date_label(l.performed_on),
+                name=l.action_name,
+                duration_minutes=l.duration_minutes,
+            ) for l in cat_logs],
+            suggestion=SUGGESTIONS[c["key"]],
+        ))
+
+    recent = (
+        db.query(SoilActionLog)
+        .order_by(SoilActionLog.performed_on.desc(), SoilActionLog.id.desc())
+        .limit(10)
+        .all()
+    )
+
+    headline, note = _build_headline(scores)
+    overall = round(sum(scores.values()) / len(scores))
+
+    return SoilSummary(
+        headline=headline,
+        overall_score=overall,
+        overall_note=note,
+        categories=cards,
+        recent_logs=[_log_out(l) for l in recent],
+        aria_message=_rule_based_aria(scores),
+    )
+
+
+@router.get("/actions", response_model=list[SoilActionDefOut])
+def list_soil_actions(db: Session = Depends(get_db)):
+    _seed_action_defs(db)
+    defs = (
+        db.query(SoilActionDefinition)
+        .filter(SoilActionDefinition.is_active.is_(True))
+        .order_by(SoilActionDefinition.category_key.asc(), SoilActionDefinition.sort_order.asc())
+        .all()
+    )
+    return [SoilActionDefOut(
+        id=d.id, name=d.name, category_key=d.category_key,
+        base_score=d.base_score, default_minutes=d.default_minutes,
+        icon=d.icon, is_quick=d.is_quick,
+    ) for d in defs]
+
+
+@router.post("/logs", response_model=SoilLogOut, status_code=201)
+def create_soil_log(payload: SoilLogCreate, db: Session = Depends(get_db)):
+    definition = None
+    if payload.action_definition_id:
+        definition = db.query(SoilActionDefinition).filter(
+            SoilActionDefinition.id == payload.action_definition_id
+        ).first()
+
+    name = (payload.action_name or "").strip() or (definition.name if definition else "")
+    category = payload.category_key or (definition.category_key if definition else None)
+    if not name or category not in CATEGORY_KEYS:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=422, detail="action_name and valid category_key required")
+
+    log = SoilActionLog(
+        action_definition_id=definition.id if definition else None,
+        action_name=name,
+        category_key=category,
+        performed_on=payload.performed_on or date.today(),
+        duration_minutes=payload.duration_minutes or (definition.default_minutes if definition else None),
+        note=payload.note,
+    )
+    db.add(log)
+    db.commit()
+    db.refresh(log)
+    return _log_out(log)
+
+
+@router.delete("/logs/{log_id}", status_code=204)
+def delete_soil_log(log_id: int, db: Session = Depends(get_db)):
+    log = db.query(SoilActionLog).filter(SoilActionLog.id == log_id).first()
+    if not log:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="not found")
+    db.delete(log)
+    db.commit()
+    return None

@@ -1,105 +1,90 @@
-import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import {
-  DailyLog,
+  createSoilLog,
+  deleteSoilLog,
+  fetchSoilActions,
   fetchSoilAriaComment,
-  fetchSoilStatus,
-  fetchSoilToday,
-  fetchWeeklySoilReport,
-  logUsualDay,
-  SoilStatus,
-  updateLog,
-  WeeklySoilReport,
+  fetchSoilSummary,
+  SoilActionDef,
+  SoilSummary,
 } from "../api/client";
 import "./Soil.css";
 
-const SOIL_ICON: Record<string, string> = {
-  rich: "🌱", ok: "🌍", dry: "🏜️", unknown: "🌫️",
+const CATEGORY_ORDER = ["body", "knowledge", "creation", "mind", "life"];
+const CATEGORY_LABEL: Record<string, string> = {
+  body: "身体", knowledge: "知識", creation: "創作", mind: "心", life: "生活",
 };
 
-const SLEEP_OPTIONS = [4, 5, 6, 7, 8, 9];
-const MOOD_OPTIONS = [
-  { value: 1, label: "😞" }, { value: 2, label: "😕" }, { value: 3, label: "😐" },
-  { value: 4, label: "🙂" }, { value: 5, label: "😄" },
-];
-const ENERGY_OPTIONS = [
-  { value: 1, label: "😩 疲れた" }, { value: 2, label: "😐 普通" }, { value: 3, label: "😊 元気" },
-];
-
-function ScoreBar({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="soil-bar-row">
-      <span className="soil-bar-label">{label}</span>
-      <div className="soil-bar-track">
-        <div className="soil-bar-fill" style={{ width: `${value}%` }} />
-      </div>
-      <span className="soil-bar-value">{value}</span>
-    </div>
-  );
-}
-
 export default function Soil() {
-  const [status, setStatus] = useState<SoilStatus | null>(null);
-  const [todayLog, setTodayLog] = useState<DailyLog | null>(null);
-  const [report, setReport] = useState<WeeklySoilReport | null>(null);
-  const [loadingReport, setLoadingReport] = useState(false);
+  const [summary, setSummary] = useState<SoilSummary | null>(null);
+  const [actions, setActions] = useState<SoilActionDef[]>([]);
   const [saving, setSaving] = useState(false);
-  const [adjusting, setAdjusting] = useState(false);
-  const [justLogged, setJustLogged] = useState(false);
+  const [addingCustom, setAddingCustom] = useState(false);
+  const [customName, setCustomName] = useState("");
+  const [customCategory, setCustomCategory] = useState("creation");
+  const [customMinutes, setCustomMinutes] = useState(15);
+  const [flash, setFlash] = useState<string | null>(null);
   const [ariaComment, setAriaComment] = useState<string | null>(null);
   const [ariaThinking, setAriaThinking] = useState(false);
   const [ariaFailed, setAriaFailed] = useState(false);
   const lastAriaFetch = useRef(0);
 
   const load = async () => {
-    const [s, t] = await Promise.all([fetchSoilStatus(), fetchSoilToday()]);
-    setStatus(s);
-    setTodayLog(t);
+    const [s, a] = await Promise.all([fetchSoilSummary(), fetchSoilActions()]);
+    setSummary(s);
+    setActions(a);
   };
 
   useEffect(() => {
     load().catch(() => {});
   }, []);
 
-  const handleUsual = async () => {
+  const quickAdd = async (def: SoilActionDef) => {
+    if (saving) return;
     setSaving(true);
     try {
-      const result = await logUsualDay();
-      setTodayLog(result.log);
-      setJustLogged(true);
+      await createSoilLog({ action_definition_id: def.id });
+      setFlash(`${def.icon ?? "🌱"} ${def.name} を耕しました`);
+      setTimeout(() => setFlash(null), 2500);
       await load();
     } finally {
       setSaving(false);
     }
   };
 
-  const patch = async (fields: Partial<DailyLog>) => {
-    if (!todayLog) return;
+  const submitCustom = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!customName.trim() || saving) return;
     setSaving(true);
     try {
-      const updated = await updateLog(todayLog.id, fields);
-      setTodayLog(updated);
-      const s = await fetchSoilStatus();
-      setStatus(s);
+      await createSoilLog({
+        action_name: customName.trim(),
+        category_key: customCategory,
+        duration_minutes: customMinutes,
+      });
+      setFlash(`🌱 ${customName.trim()} を耕しました`);
+      setTimeout(() => setFlash(null), 2500);
+      setCustomName("");
+      setAddingCustom(false);
+      await load();
     } finally {
       setSaving(false);
     }
   };
 
-  const loadReport = async () => {
-    setLoadingReport(true);
+  const removeLog = async (id: number) => {
+    setSaving(true);
     try {
-      setReport(await fetchWeeklySoilReport());
+      await deleteSoilLog(id);
+      await load();
     } finally {
-      setLoadingReport(false);
+      setSaving(false);
     }
   };
 
-  const askAriaAboutSoil = async () => {
+  const askAria = async () => {
     if (ariaThinking) return;
-    // 3分以内の再タップは無視（サーバー側も3分キャッシュ）
     if (ariaComment && Date.now() - lastAriaFetch.current < 3 * 60 * 1000) return;
-
     setAriaThinking(true);
     setAriaFailed(false);
     try {
@@ -119,163 +104,169 @@ export default function Soil() {
     }
   };
 
+  if (!summary) {
+    return <div className="soil-page"><p className="soil-muted">読み込み中...</p></div>;
+  }
+
+  const quickByCategory = CATEGORY_ORDER.map((key) => ({
+    key,
+    defs: actions.filter((a) => a.category_key === key && a.is_quick),
+  }));
+
   return (
     <div className="soil-page">
 
-      {/* ── 今日の土壌チェック（10秒） ── */}
-      <section className="card soil-check-card">
-        <p className="soil-kicker">今日の土壌チェック</p>
-        {!todayLog ? (
-          <>
-            <p className="soil-muted">いつも通りなら、このボタンだけで終わりです。</p>
-            <button className="soil-usual-btn" onClick={handleUsual} disabled={saving}>
-              ✓ いつも通り（睡眠7h・気分ふつう）
-            </button>
-          </>
-        ) : (
-          <>
-            <div className="soil-logged-row">
-              <span className="soil-logged-badge">
-                {justLogged ? "✓ 記録しました" : "✓ 今日は記録済み"}
-              </span>
-              <span className="soil-logged-summary">
-                😴{todayLog.sleep_hours}h ／ {MOOD_OPTIONS.find((m) => m.value === todayLog.mood_score)?.label} ／ {ENERGY_OPTIONS.find((e) => e.value === todayLog.energy_level)?.label}
-                {todayLog.did_workout && " ／ 💪"}
-                {todayLog.drank_alcohol && " ／ 🍺"}
-              </span>
-              <button className="soil-adjust-btn" onClick={() => setAdjusting((v) => !v)}>
-                {adjusting ? "閉じる" : "違った日だけ調整"}
-              </button>
-            </div>
+      {flash && <div className="soil-flash">{flash}</div>}
 
-            {adjusting && (
-              <div className="soil-adjust-panel">
-                <div className="soil-adjust-group">
-                  <span>😴 睡眠</span>
-                  <div className="soil-chip-row">
-                    {SLEEP_OPTIONS.map((h) => (
-                      <button key={h} className={`soil-chip ${todayLog.sleep_hours === h ? "active" : ""}`}
-                        onClick={() => patch({ sleep_hours: h })} disabled={saving}>
-                        {h}h
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="soil-adjust-group">
-                  <span>気分</span>
-                  <div className="soil-chip-row">
-                    {MOOD_OPTIONS.map(({ value, label }) => (
-                      <button key={value} className={`soil-chip ${todayLog.mood_score === value ? "active" : ""}`}
-                        onClick={() => patch({ mood_score: value })} disabled={saving}>
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="soil-adjust-group">
-                  <span>エネルギー</span>
-                  <div className="soil-chip-row">
-                    {ENERGY_OPTIONS.map(({ value, label }) => (
-                      <button key={value} className={`soil-chip ${todayLog.energy_level === value ? "active" : ""}`}
-                        onClick={() => patch({ energy_level: value })} disabled={saving}>
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="soil-adjust-group">
-                  <span>その他</span>
-                  <div className="soil-chip-row">
-                    <button className={`soil-chip ${todayLog.did_workout ? "active" : ""}`}
-                      onClick={() => patch({ did_workout: !todayLog.did_workout })} disabled={saving}>
-                      💪 筋トレした
-                    </button>
-                    <button className={`soil-chip ${todayLog.drank_alcohol ? "active" : ""}`}
-                      onClick={() => patch({ drank_alcohol: !todayLog.drank_alcohol })} disabled={saving}>
-                      🍺 飲んだ
-                    </button>
-                  </div>
-                </div>
-                <Link to={`/private/log/edit/${todayLog.id}`} className="soil-detail-link">
-                  もっと細かく記録する →
-                </Link>
-              </div>
-            )}
-          </>
-        )}
-      </section>
-
-      {/* ── 土壌の状態（直近7日の自動判定） ── */}
-      {status && (
-        <section className={`card soil-status-card soil-${status.state}`}>
-          <div className="soil-status-head">
-            <span className="soil-status-icon">{SOIL_ICON[status.state] ?? "🌍"}</span>
-            <div>
-              <p className="soil-kicker">土壌の状態（直近7日）</p>
-              <h2>{status.label}</h2>
-            </div>
-            {status.log_days > 0 && <span className="soil-days-badge">観測 {status.log_days}/7日</span>}
-          </div>
-          {status.log_days > 0 && (
-            <div className="soil-bars">
-              <ScoreBar label="😴 睡眠" value={status.sleep_score} />
-              <ScoreBar label="🙂 気分" value={status.mood_score} />
-              <ScoreBar label="🛌 回復" value={status.recovery_score} />
-            </div>
-          )}
-          <div
-            className={`soil-aria-bubble ${ariaComment ? "ai" : ""} ${ariaThinking ? "thinking" : ""}`}
-            onClick={askAriaAboutSoil}
-            title="タップするとアリアが土壌を見てコメントします"
-          >
-            <span className="soil-aria-face">
-              {ariaThinking ? "(・ω・ )?" : "(＾ω＾)"} アリア
-            </span>
-            <p>
-              {ariaThinking
-                ? "……（土を観察中）"
-                : ariaFailed
-                  ? "（電波が悪いみたいです…少ししたらまたタップしてください）"
-                  : ariaComment
-                    ? `✨ ${ariaComment}`
-                    : status.comment}
-            </p>
-            {!ariaComment && !ariaThinking && !ariaFailed && (
-              <span className="soil-aria-hint">タップでアリアに聞く</span>
-            )}
-          </div>
-        </section>
-      )}
-
-      {/* ── アリアの週次土壌報告 ── */}
-      <section className="card soil-report-card">
-        <div className="soil-report-head">
-          <p className="soil-kicker">📜 アリアの週次土壌報告</p>
-          {!report && (
-            <button className="soil-report-btn" onClick={loadReport} disabled={loadingReport}>
-              {loadingReport ? "アリアが観察中..." : "報告を聞く"}
-            </button>
+      {/* ── 今日の一言 ── */}
+      <section className="card soil-headline-card">
+        <p className="soil-subtitle">自分の畑を、毎日少しずつ耕す。</p>
+        <h2 className="soil-headline">{summary.headline}</h2>
+        <div
+          className={`soil-aria-bubble ${ariaComment ? "ai" : ""} ${ariaThinking ? "thinking" : ""}`}
+          onClick={askAria}
+          title="タップするとアリアが畑を見てコメントします"
+        >
+          <span className="soil-aria-face">
+            {ariaThinking ? "(・ω・ )?" : "(＾ω＾)"} アリア
+          </span>
+          <p>
+            {ariaThinking
+              ? "……（畑を観察中）"
+              : ariaFailed
+                ? "（電波が悪いみたいです…少ししたらまたタップしてください）"
+                : ariaComment
+                  ? `✨ ${ariaComment}`
+                  : summary.aria_message}
+          </p>
+          {!ariaComment && !ariaThinking && !ariaFailed && (
+            <span className="soil-aria-hint">タップでアリアに聞く</span>
           )}
         </div>
-        {report && (
-          <>
-            <div className="soil-report-bubble">
-              <span className="soil-report-face">(＾ω＾) アリア</span>
-              <p>{report.message}</p>
+      </section>
+
+      {/* ── 5つの畑 ── */}
+      <div className="soil-fields-grid">
+        {summary.categories.map((field) => (
+          <section className="card soil-field-card" key={field.key} style={{ borderLeftColor: field.color }}>
+            <div className="soil-field-head">
+              <span className="soil-field-icon" style={{ background: `${field.color}22` }}>{field.icon}</span>
+              <div>
+                <strong>{field.name}</strong>
+                <span className="soil-field-label">{field.label}</span>
+              </div>
+              <span className="soil-field-score">{field.score}</span>
             </div>
-            <div className="soil-report-stats">
-              <span>😴 {report.avg_sleep}h <em>（先週 {report.prev_avg_sleep}h）</em></span>
-              <span>🙂 {report.avg_mood}/5 <em>（先週 {report.prev_avg_mood}/5）</em></span>
-              <span>💪 {report.workout_days}日</span>
-              <span>🍺 {report.alcohol_days}日</span>
-              <span>🏢 残業{report.overtime_hours}h</span>
+            <div className="soil-bar-track">
+              <div className="soil-bar-fill" style={{ width: `${field.score}%`, background: field.color }} />
             </div>
-          </>
-        )}
-        {!report && !loadingReport && (
-          <p className="soil-muted">週に一度、改善点を一つだけ。日曜の夜に聞くのがおすすめです。</p>
+            {field.recent.length > 0 ? (
+              <ul className="soil-field-recent">
+                {field.recent.map((r, i) => (
+                  <li key={i}>
+                    <span>{r.date_label}</span> {r.name}
+                    {r.duration_minutes ? ` ${r.duration_minutes}分` : ""}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="soil-field-empty">この7日はまだ静かです</p>
+            )}
+            <p className="soil-field-suggestion">💧 {field.suggestion}</p>
+          </section>
+        ))}
+
+        {/* 全体の畑（補助表示） */}
+        <section className="card soil-field-card soil-overall-card">
+          <div className="soil-field-head">
+            <span className="soil-field-icon">🌾</span>
+            <div>
+              <strong>今週の自分の畑</strong>
+              <span className="soil-field-label">全体</span>
+            </div>
+            <span className="soil-field-score">{summary.overall_score}</span>
+          </div>
+          <div className="soil-bar-track">
+            <div className="soil-bar-fill" style={{ width: `${summary.overall_score}%` }} />
+          </div>
+          <p className="soil-field-suggestion">{summary.overall_note}</p>
+        </section>
+      </div>
+
+      {/* ── クイック追加 ── */}
+      <section className="card soil-quick-card">
+        <p className="soil-kicker">🌱 耕したことを記録</p>
+        {quickByCategory.map(({ key, defs }) => defs.length > 0 && (
+          <div className="soil-quick-group" key={key}>
+            <span className="soil-quick-label">{CATEGORY_LABEL[key]}</span>
+            <div className="soil-chip-row">
+              {defs.map((def) => (
+                <button key={def.id} className="soil-chip" onClick={() => quickAdd(def)} disabled={saving}>
+                  {def.icon} {def.name}
+                  {def.default_minutes ? ` ${def.default_minutes}分` : ""}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+
+        {addingCustom ? (
+          <form className="soil-custom-form" onSubmit={submitCustom}>
+            <input
+              placeholder="やったこと（例: 皿洗い）"
+              value={customName}
+              onChange={(e) => setCustomName(e.target.value)}
+              autoFocus
+            />
+            <div className="soil-chip-row">
+              {CATEGORY_ORDER.map((key) => (
+                <button type="button" key={key}
+                  className={`soil-chip ${customCategory === key ? "active" : ""}`}
+                  onClick={() => setCustomCategory(key)}>
+                  {CATEGORY_LABEL[key]}
+                </button>
+              ))}
+            </div>
+            <div className="soil-chip-row">
+              {[5, 10, 15, 30, 60].map((m) => (
+                <button type="button" key={m}
+                  className={`soil-chip ${customMinutes === m ? "active" : ""}`}
+                  onClick={() => setCustomMinutes(m)}>
+                  {m}分
+                </button>
+              ))}
+            </div>
+            <div className="soil-custom-actions">
+              <button type="submit" className="soil-usual-btn" disabled={saving || !customName.trim()}>記録する</button>
+              <button type="button" className="soil-adjust-btn" onClick={() => setAddingCustom(false)}>閉じる</button>
+            </div>
+          </form>
+        ) : (
+          <button className="soil-adjust-btn soil-custom-toggle" onClick={() => setAddingCustom(true)}>
+            ＋ その他の行動を記録
+          </button>
         )}
       </section>
+
+      {/* ── 最近耕したこと ── */}
+      {summary.recent_logs.length > 0 && (
+        <section className="card soil-recent-card">
+          <p className="soil-kicker">最近耕したこと</p>
+          <ul className="soil-recent-list">
+            {summary.recent_logs.map((log) => (
+              <li key={log.id}>
+                <span className="soil-recent-date">{log.date_label}</span>
+                <span className="soil-recent-name">
+                  {log.action_name}
+                  {log.duration_minutes ? ` ${log.duration_minutes}分` : ""}
+                </span>
+                <span className="soil-recent-cat">{log.category_name}</span>
+                <button className="soil-recent-delete" onClick={() => removeLog(log.id)} disabled={saving} title="削除">×</button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
     </div>
   );
