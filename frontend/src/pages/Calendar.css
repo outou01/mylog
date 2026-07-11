@@ -578,44 +578,6 @@
   color: #f1d899;
 }
 
-.aria-week-guide {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 0.8rem;
-  min-height: 54px;
-  border: 1px solid rgba(159, 201, 216, 0.2);
-  border-left: 3px solid #9fc9d8;
-  background: #111c1c;
-  padding: 0.6rem 0.75rem;
-}
-
-.aria-week-face {
-  color: #f1d899;
-  font-family: var(--font-mono);
-  font-size: 0.78rem;
-  white-space: nowrap;
-}
-
-.aria-week-guide p {
-  color: #d5ded1;
-  font-size: 0.82rem;
-  line-height: 1.55;
-  margin: 0;
-}
-
-.aria-week-guide button {
-  min-height: 34px;
-  border: 1px solid rgba(159, 201, 216, 0.3);
-  border-radius: 5px;
-  background: rgba(159, 201, 216, 0.08);
-  color: #bfe0e9;
-  font-size: 0.74rem;
-  font-weight: 800;
-  padding: 0.4rem 0.65rem;
-  white-space: nowrap;
-}
-
 .week-board {
   border-color: rgba(126, 163, 117, 0.25);
   background: #0c1515;
@@ -777,8 +739,7 @@
 }
 
 @media (max-width: 700px) {
-  .schedule-topbar,
-  .aria-week-guide {
+  .schedule-topbar {
     align-items: stretch;
   }
 
@@ -788,14 +749,6 @@
 
   .schedule-add-btn {
     width: 100%;
-  }
-
-  .aria-week-guide {
-    grid-template-columns: auto 1fr;
-  }
-
-  .aria-week-guide button {
-    grid-column: 1 / -1;
   }
 
   .category-quick-strip {

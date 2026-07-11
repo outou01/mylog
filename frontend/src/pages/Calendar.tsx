@@ -1,6 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import {
-  createScheduleMessage,
   createScheduleBlock,
   deleteScheduleBlock,
   fetchWeekSchedule,
@@ -115,8 +114,6 @@ export default function Calendar() {
   const [formOpen, setFormOpen] = useState(false);
   const [draggingId, setDraggingId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
-  const [ariaLoading, setAriaLoading] = useState(false);
-  const [ariaFallback, setAriaFallback] = useState(false);
 
   const weekDays = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
 
@@ -128,6 +125,15 @@ export default function Calendar() {
   useEffect(() => {
     loadSchedule();
   }, [weekStart]);
+
+  useEffect(() => {
+    document.body.dataset.ariaContext = tab === "schedule" ? "calendar-week" : "calendar-growth";
+    document.body.dataset.ariaWeekStart = weekStart;
+    return () => {
+      delete document.body.dataset.ariaContext;
+      delete document.body.dataset.ariaWeekStart;
+    };
+  }, [tab, weekStart]);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -193,18 +199,6 @@ export default function Calendar() {
       await loadSchedule();
     } finally {
       setSaving(false);
-    }
-  };
-
-  const askAria = async () => {
-    if (ariaLoading) return;
-    setAriaLoading(true);
-    try {
-      const result = await createScheduleMessage(weekStart);
-      setSchedule((current) => current ? { ...current, schedule_message: result.message } : current);
-      setAriaFallback(result.is_fallback);
-    } finally {
-      setAriaLoading(false);
     }
   };
 
@@ -288,13 +282,6 @@ export default function Calendar() {
               ))}
             </div>
 
-            <div className="aria-week-guide">
-              <span className="aria-week-face">(｀・ω・´)</span>
-              <p>{schedule.schedule_message}{ariaFallback ? " ※自動生成" : ""}</p>
-              <button type="button" onClick={askAria} disabled={ariaLoading}>
-                {ariaLoading ? "考えています..." : "アリアに今週を見てもらう"}
-              </button>
-            </div>
           </section>
 
           <section className="schedule-layout">

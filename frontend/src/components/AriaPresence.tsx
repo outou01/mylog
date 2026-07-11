@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { fetchAriaPresence } from "../api/client";
+import { createScheduleMessage } from "../api/calendar";
 import "./AriaPresence.css";
 
 // 普段表示するローカル台詞（API消費ゼロ）。タップでGeminiに話しかける。
@@ -15,7 +16,7 @@ const PAGE_LINES: Record<string, string[]> = {
     "全部やらなくていいんです。今日の一粒だけ。",
   ],
   "/calendar": [
-    "ここがご主人様の畑です。ゆっくり見ていってください。",
+    "今週の時間を見ながら、アリアに声をかけてみてください。",
     "空いている区画に、種をひとつ植えてみませんか？",
     "植えた種は、30分でもちゃんと育ちますよ。",
   ],
@@ -84,7 +85,8 @@ export default function AriaPresence() {
     if (thinking) return;
 
     // AIの返事を表示中、またはクールダウン中はローカル台詞をローテーション
-    const key = pageKey(location.pathname);
+    const isCalendarWeek = location.pathname === "/calendar" && document.body.dataset.ariaContext === "calendar-week";
+    const key = isCalendarWeek ? "calendar-week" : pageKey(location.pathname);
     const last = lastAiFetch.current[key] ?? 0;
     if (aiMessage || Date.now() - last < AI_COOLDOWN_MS) {
       setAiMessage(null);
@@ -94,6 +96,14 @@ export default function AriaPresence() {
 
     setThinking(true);
     try {
+      if (isCalendarWeek) {
+        const result = await createScheduleMessage(document.body.dataset.ariaWeekStart);
+        lastAiFetch.current[key] = result.is_fallback
+          ? Date.now() - AI_COOLDOWN_MS + FAIL_COOLDOWN_MS
+          : Date.now();
+        setAiMessage(`${result.message}${result.is_fallback ? " ※自動生成" : ""}`);
+        return;
+      }
       const result = await fetchAriaPresence(key);
       if (result.is_ai) {
         lastAiFetch.current[key] = Date.now();
