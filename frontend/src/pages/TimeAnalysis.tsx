@@ -8,6 +8,8 @@ import {
 } from "../api/calendar";
 import "./TimeAnalysis.css";
 
+const WEEKLY_SCALE_MINUTES = 8 * 60;
+const MONTHLY_SCALE_MINUTES = 30 * 60;
 const CUMULATIVE_SCALE_MINUTES = 100 * 60;
 
 const FIELD_DEFINITIONS = [
@@ -41,6 +43,14 @@ function growthLabel(percent: number) {
   return "これから育つ";
 }
 
+function plantStage(percent: number) {
+  if (percent >= 80) return { icon: "🌻", label: "花が咲いている" };
+  if (percent >= 55) return { icon: "🌿", label: "葉が広がっている" };
+  if (percent >= 25) return { icon: "🌱", label: "芽が伸びている" };
+  if (percent > 0) return { icon: "·🌱", label: "芽が出た" };
+  return { icon: "·", label: "種を待っている" };
+}
+
 function toFields(categories: TimeCategoryTotal[], scaleMinutes: number): FieldGrowth[] {
   return FIELD_DEFINITIONS.map((field) => {
     const minutes = categories
@@ -71,13 +81,61 @@ function SoilFieldList({ fields }: { fields: FieldGrowth[] }) {
               <div className="soil-bar-fill" style={{ width: `${field.percent}%`, background: field.color }} />
             </div>
           </div>
-          <div className="soil-field-side">
-            <strong>{field.hours.toFixed(1)}h</strong>
-            <span>{field.label}</span>
-          </div>
+            <div className="soil-field-side">
+              <strong>{field.hours.toFixed(1)}h</strong>
+              <span>{field.label} ・ {field.percent}%</span>
+            </div>
         </div>
       ))}
     </div>
+  );
+}
+
+function WeeklyGarden({ section }: { section: TimeAnalysisSection }) {
+  const fields = toFields(section.categories, WEEKLY_SCALE_MINUTES);
+  const totalHours = fields.reduce((total, field) => total + field.hours, 0);
+  const activeFields = fields.filter((field) => field.minutes > 0).length;
+
+  return (
+    <section className="weekly-garden">
+      <header className="garden-head">
+        <div>
+          <span>今週の畑</span>
+          <h2>{totalHours.toFixed(1)}時間、未来を育てた</h2>
+        </div>
+        <p>{section.label}</p>
+      </header>
+
+      <div className="garden-horizon" aria-hidden="true">
+        <span className="garden-sun">☀</span>
+        <span className="garden-cloud">☁</span>
+        <span className="garden-copy">
+          {activeFields > 0 ? `${activeFields}つの畑に芽が出ています` : "最初の種を待っています"}
+        </span>
+      </div>
+
+      <div className="garden-plots">
+        {fields.map((field) => {
+          const stage = plantStage(field.percent);
+          return (
+            <div className="garden-plot" key={field.key} style={{ "--field-color": field.color } as React.CSSProperties}>
+              <div className="plot-name">
+                <span>{field.icon}</span>
+                <div><strong>{field.name}</strong><small>{stage.label}</small></div>
+              </div>
+              <div className="plot-growth">
+                <div className="plot-track">
+                  <div className="plot-fill" style={{ width: `${field.percent}%` }} />
+                  {field.percent > 0 && <span className="plot-plant" style={{ left: `${Math.max(4, Math.min(94, field.percent))}%` }}>{stage.icon}</span>}
+                </div>
+                <div className="plot-scale"><span>0h</span><span>4h</span><span>8h</span></div>
+              </div>
+              <div className="plot-time"><strong>{field.hours.toFixed(1)}h</strong><span>/ 8h</span></div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
@@ -133,8 +191,11 @@ export default function TimeAnalysis({ embedded = false }: { embedded?: boolean 
 
       {analysis && (
         <div className="soil-growth-stack">
-          <PeriodField title="今週の畑" section={analysis.weekly} />
-          <PeriodField title="今月の畑" section={analysis.monthly} />
+          <WeeklyGarden section={analysis.weekly} />
+          <PeriodField
+            title="今月の畑"
+            section={{ ...analysis.monthly, scale_minutes: MONTHLY_SCALE_MINUTES }}
+          />
           <CumulativeField summary={analysis.field_summary} />
         </div>
       )}
