@@ -1,146 +1,67 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  createTimeAnalysisComment,
   FieldSummary,
   fetchTimeAnalysis,
   TimeAnalysis as TimeAnalysisData,
-  TimeAnalysisComment,
   TimeAnalysisSection,
+  TimeCategoryTotal,
 } from "../api/calendar";
 import "./TimeAnalysis.css";
 
-const SECTION_COPY: Record<TimeAnalysisComment["scope"], { title: string; button: string }> = {
-  daily: { title: "今日の畑", button: "今日の畑を見てもらう" },
-  weekly: { title: "今週の畑", button: "今週の畑を見てもらう" },
-  monthly: { title: "今月の畑", button: "今月の畑を見てもらう" },
-};
+const CUMULATIVE_SCALE_MINUTES = 100 * 60;
 
 function localDate(d = new Date()) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-function hours(minutes: number) {
-  return (minutes / 60).toFixed(1);
-}
-
-function FieldSummaryCard({ summary }: { summary: FieldSummary }) {
-  const level = summary.level;
-  const remainingHours = level.remaining_minutes == null ? null : hours(level.remaining_minutes);
-
+function GrowthRows({ categories, scaleMinutes }: { categories: TimeCategoryTotal[]; scaleMinutes: number }) {
   return (
-    <section className="field-hero">
-      <div className="field-hero-copy">
-        <p className="analysis-kicker">累計成長記録</p>
-        <h1>自分の畑</h1>
-        <p>
-          仕事だけに人生を使わないため。
-          未来の自分が笑えるように、自分の畑を耕す。
-        </p>
-      </div>
-
-      <div className="field-summary-panel">
-        <div>
-          <span className="field-label">累計耕作時間</span>
-          <strong>{summary.total_hours.toFixed(1)}h</strong>
-        </div>
-        <div className="field-level">
-          <span>Lv{level.level}</span>
-          <strong>{level.title}</strong>
-          {level.next_title && remainingHours ? (
-            <em>あと{remainingHours}hで「{level.next_title}」</em>
-          ) : (
-            <em>最大レベルまで育っています</em>
-          )}
-        </div>
-      </div>
-
-      <div className="field-category-totals">
-        {summary.categories.map((category) => (
-          <div className="field-total-row" key={category.key}>
-            <span className="bar-dot" style={{ background: category.color }} />
-            <span>{category.label}</span>
+    <div className="growth-rows">
+      {categories.map((category) => {
+        const width = Math.min(100, (category.minutes / scaleMinutes) * 100);
+        return (
+          <div className="growth-row" key={category.key}>
+            <span className="growth-name">
+              <i style={{ background: category.color }} />
+              {category.label}
+            </span>
+            <div className="growth-track" aria-label={`${category.label} ${category.hours.toFixed(1)}時間`}>
+              <div className="growth-fill" style={{ width: `${width}%`, background: category.color }} />
+            </div>
             <strong>{category.hours.toFixed(1)}h</strong>
           </div>
-        ))}
-      </div>
+        );
+      })}
+    </div>
+  );
+}
 
-      <div className="field-linked-totals">
-        <div>
-          <h2>夢別の積み上げ</h2>
-          {summary.dreams.length ? summary.dreams.map((dream) => (
-            <p key={dream.id}><span>{dream.title}</span><strong>{dream.hours.toFixed(1)}h</strong></p>
-          )) : <p className="muted">夢に紐づいた時間はこれから育ちます。</p>}
-        </div>
-        <div>
-          <h2>プロジェクト別の積み上げ</h2>
-          {summary.projects.length ? summary.projects.map((project) => (
-            <p key={project.id}><span>{project.title}</span><strong>{project.hours.toFixed(1)}h</strong></p>
-          )) : <p className="muted">種リストから予定を植えると、ここに積み上がります。</p>}
-        </div>
-      </div>
+function PeriodGrowth({ title, section }: { title: string; section: TimeAnalysisSection }) {
+  return (
+    <section className="growth-section">
+      <header className="growth-section-head">
+        <h2>{title}</h2>
+        <span>{section.label}</span>
+      </header>
+      <GrowthRows categories={section.categories} scaleMinutes={section.scale_minutes} />
     </section>
   );
 }
 
-function AnalysisSection({
-  scope,
-  section,
-  comment,
-  requesting,
-  onRequestComment,
-}: {
-  scope: TimeAnalysisComment["scope"];
-  section: TimeAnalysisSection;
-  comment: TimeAnalysisComment | undefined;
-  requesting: boolean;
-  onRequestComment: (scope: TimeAnalysisComment["scope"]) => void;
-}) {
-  const copy = SECTION_COPY[scope];
-
+function CumulativeGrowth({ summary }: { summary: FieldSummary }) {
+  const level = summary.level;
   return (
-    <section className="analysis-card">
-      <div className="analysis-section-head">
-        <div>
-          <p className="analysis-kicker">{copy.title}</p>
-          <h2>{section.label}</h2>
-        </div>
-      </div>
-
-      <div className="bar-list">
-        {section.categories.map((category) => {
-          const rawWidth = (category.minutes / section.scale_minutes) * 100;
-          const width = category.minutes === 0 ? 0 : Math.max(4, Math.min(100, rawWidth));
-          return (
-            <div className="bar-row" key={category.key}>
-              <div className="bar-name">
-                <span className="bar-dot" style={{ background: category.color }} />
-                {category.label}
-              </div>
-              <div className="bar-track" aria-label={`${category.label} ${category.hours.toFixed(1)}時間`}>
-                <div
-                  className="bar-fill"
-                  style={{
-                    width: `${width}%`,
-                    background: category.color,
-                  }}
-                />
-              </div>
-              <div className="bar-value">{category.hours.toFixed(1)}h</div>
-            </div>
-          );
-        })}
-      </div>
-
-      <div className="aria-analysis">
-        {comment ? (
-          <p>{comment.comment}{comment.is_fallback ? " ※自動生成" : ""}</p>
-        ) : (
-          <p className="muted">必要な時だけ、アリアにこの畑を見てもらえます。</p>
-        )}
-        <button className="aria-comment-btn" type="button" onClick={() => onRequestComment(scope)} disabled={requesting}>
-          {requesting ? "アリア確認中..." : copy.button}
-        </button>
-      </div>
+    <section className="growth-section cumulative-growth">
+      <header className="growth-section-head">
+        <h2>累計成長記録</h2>
+        <span>
+          Lv{level.level} {level.title} ・ {summary.total_hours.toFixed(1)}h
+        </span>
+      </header>
+      <GrowthRows categories={summary.categories} scaleMinutes={CUMULATIVE_SCALE_MINUTES} />
+      {level.next_title && level.remaining_minutes != null && (
+        <p className="growth-next">あと{(level.remaining_minutes / 60).toFixed(1)}hで「{level.next_title}」</p>
+      )}
     </section>
   );
 }
@@ -149,67 +70,29 @@ export default function TimeAnalysis({ embedded = false }: { embedded?: boolean 
   const today = useMemo(() => localDate(), []);
   const [targetDate, setTargetDate] = useState(today);
   const [analysis, setAnalysis] = useState<TimeAnalysisData | null>(null);
-  const [comments, setComments] = useState<Partial<Record<TimeAnalysisComment["scope"], TimeAnalysisComment>>>({});
-  const [requestingScope, setRequestingScope] = useState<TimeAnalysisComment["scope"] | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     setLoading(true);
-    setComments({});
     fetchTimeAnalysis(targetDate)
       .then(setAnalysis)
       .finally(() => setLoading(false));
   }, [targetDate]);
 
-  const requestComment = async (scope: TimeAnalysisComment["scope"]) => {
-    setRequestingScope(scope);
-    try {
-      const comment = await createTimeAnalysisComment(scope, targetDate);
-      setComments((current) => ({ ...current, [scope]: comment }));
-    } finally {
-      setRequestingScope(null);
-    }
-  };
-
   return (
     <div className={`time-analysis-page ${embedded ? "embedded" : ""}`}>
-      <section className="analysis-toolbar">
-        <div>
-          <p className="analysis-kicker">成長ログ</p>
-          <h1>畑の成長記録</h1>
-        </div>
-        <label className="analysis-date">
-          日付
-          <input type="date" value={targetDate} onChange={(event) => setTargetDate(event.target.value)} />
-        </label>
-      </section>
+      <label className="growth-date">
+        <span>日付</span>
+        <input type="date" value={targetDate} onChange={(event) => setTargetDate(event.target.value)} />
+      </label>
 
-      {loading && <p className="analysis-loading">読み込み中...</p>}
+      {loading && <p className="growth-loading">読み込み中...</p>}
 
       {analysis && (
-        <div className="analysis-stack">
-          <AnalysisSection
-            scope="daily"
-            section={analysis.daily}
-            comment={comments.daily}
-            requesting={requestingScope === "daily"}
-            onRequestComment={requestComment}
-          />
-          <AnalysisSection
-            scope="weekly"
-            section={analysis.weekly}
-            comment={comments.weekly}
-            requesting={requestingScope === "weekly"}
-            onRequestComment={requestComment}
-          />
-          <AnalysisSection
-            scope="monthly"
-            section={analysis.monthly}
-            comment={comments.monthly}
-            requesting={requestingScope === "monthly"}
-            onRequestComment={requestComment}
-          />
-          <FieldSummaryCard summary={analysis.field_summary} />
+        <div className="growth-stack">
+          <PeriodGrowth title="今週の畑" section={analysis.weekly} />
+          <PeriodGrowth title="今月の畑" section={analysis.monthly} />
+          <CumulativeGrowth summary={analysis.field_summary} />
         </div>
       )}
     </div>
