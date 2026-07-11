@@ -77,6 +77,11 @@ export interface WeekSchedule {
   blocks: ScheduleBlock[];
 }
 
+export interface ScheduleMessage {
+  message: string;
+  is_fallback: boolean;
+}
+
 export interface ScheduleBlockPayload {
   date: string;
   start_time: string;
@@ -163,6 +168,9 @@ export const fetchPatterns = () =>
 
 export const fetchWeekSchedule = (week_start?: string) =>
   api.get<WeekSchedule>("/calendar/schedule-week", { params: { week_start } }).then((r) => r.data);
+
+export const createScheduleMessage = (week_start?: string) =>
+  api.post<ScheduleMessage>("/calendar/schedule-message", null, { params: { week_start } }).then((r) => r.data);
 
 export const fetchTimeAnalysis = (target_date?: string) =>
   api.get<TimeAnalysis>("/calendar/time-analysis", { params: { target_date } }).then((r) => r.data);

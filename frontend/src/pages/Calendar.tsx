@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import {
+  createScheduleMessage,
   createScheduleBlock,
   deleteScheduleBlock,
   fetchWeekSchedule,
@@ -111,8 +112,11 @@ export default function Calendar() {
   const [schedule, setSchedule] = useState<WeekSchedule | null>(null);
   const [form, setForm] = useState<ScheduleBlockPayload>({ ...emptyForm, date: today });
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [formOpen, setFormOpen] = useState(false);
   const [draggingId, setDraggingId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
+  const [ariaLoading, setAriaLoading] = useState(false);
+  const [ariaFallback, setAriaFallback] = useState(false);
 
   const weekDays = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
 
@@ -137,6 +141,7 @@ export default function Calendar() {
       }
       setEditingId(null);
       setForm({ ...emptyForm, date: payload.date });
+      setFormOpen(false);
       await loadSchedule();
     } finally {
       setSaving(false);
@@ -147,6 +152,34 @@ export default function Calendar() {
     if (!block.editable || block.id == null) return;
     setEditingId(block.id);
     setForm(toPayload(block));
+    setFormOpen(true);
+  };
+
+  const openNew = (date = today, startTime?: string) => {
+    const start = startTime ? minutesOf(startTime) : minutesOf(emptyForm.start_time);
+    setEditingId(null);
+    setForm({
+      ...emptyForm,
+      date,
+      start_time: timeTextFromMinutes(start),
+      end_time: timeTextFromMinutes(start + 30),
+    });
+    setFormOpen(true);
+  };
+
+  const openNewAtPosition = (date: string, clientY: number, lane: HTMLDivElement) => {
+    if (!schedule) return;
+    const rect = lane.getBoundingClientRect();
+    const ratio = Math.max(0, Math.min(1, (clientY - rect.top) / rect.height));
+    const dayStart = schedule.day_start_hour * 60;
+    const total = (schedule.day_end_hour - schedule.day_start_hour) * 60;
+    const start = dayStart + Math.floor((ratio * total) / 30) * 30;
+    openNew(date, timeTextFromMinutes(Math.min(start, schedule.day_end_hour * 60 - 30)));
+  };
+
+  const closeForm = () => {
+    setEditingId(null);
+    setFormOpen(false);
   };
 
   const remove = async () => {
@@ -156,9 +189,22 @@ export default function Calendar() {
       await deleteScheduleBlock(editingId);
       setEditingId(null);
       setForm({ ...emptyForm, date: today });
+      setFormOpen(false);
       await loadSchedule();
     } finally {
       setSaving(false);
+    }
+  };
+
+  const askAria = async () => {
+    if (ariaLoading) return;
+    setAriaLoading(true);
+    try {
+      const result = await createScheduleMessage(weekStart);
+      setSchedule((current) => current ? { ...current, schedule_message: result.message } : current);
+      setAriaFallback(result.is_fallback);
+    } finally {
+      setAriaLoading(false);
     }
   };
 
@@ -219,26 +265,36 @@ export default function Calendar() {
 
       {tab === "schedule" && schedule && (
         <>
-          <section className="card schedule-console">
-            <div className="schedule-head">
-              <button className="cal-nav-btn" onClick={() => setWeekStart(addDays(weekStart, -7))}>‹</button>
-              <div>
-                <h2>{displayDate(schedule.week_start)} - {displayDate(schedule.week_end)}</h2>
+          <section className="schedule-console">
+            <div className="schedule-topbar">
+              <div className="schedule-head">
+                <button className="cal-nav-btn" onClick={() => setWeekStart(addDays(weekStart, -7))} title="前の週">‹</button>
+                <div>
+                  <span>MY WEEK</span>
+                  <h2>{displayDate(schedule.week_start)} - {displayDate(schedule.week_end)}</h2>
+                </div>
+                <button className="cal-nav-btn" onClick={() => setWeekStart(addDays(weekStart, 7))} title="次の週">›</button>
               </div>
-              <button className="cal-nav-btn" onClick={() => setWeekStart(addDays(weekStart, 7))}>›</button>
+              <button className="schedule-add-btn" type="button" onClick={() => openNew()}>＋ 予定を追加</button>
             </div>
 
-            <div className="schedule-actions">
+            <div className="category-quick-strip" aria-label="すぐ植える">
               {SCHEDULE_CATEGORIES.map((category) => (
                 <div className={`quick-category ${category.key}`} key={category.key}>
                   <span>{category.label}</span>
-                  <button className="schedule-btn quick" onClick={() => quickDuration(category, 30)} disabled={saving}>30分</button>
-                  <button className="schedule-btn quick" onClick={() => quickDuration(category, 60)} disabled={saving}>1時間</button>
+                  <button onClick={() => quickDuration(category, 30)} disabled={saving}>+30</button>
+                  <button onClick={() => quickDuration(category, 60)} disabled={saving}>+60</button>
                 </div>
               ))}
             </div>
 
-            <p className="schedule-note">{schedule.schedule_message || "仕事以外の時間は、余りものではなく人生の本体です。 ※自動生成"}</p>
+            <div className="aria-week-guide">
+              <span className="aria-week-face">(｀・ω・´)</span>
+              <p>{schedule.schedule_message}{ariaFallback ? " ※自動生成" : ""}</p>
+              <button type="button" onClick={askAria} disabled={ariaLoading}>
+                {ariaLoading ? "考えています..." : "アリアに今週を見てもらう"}
+              </button>
+            </div>
           </section>
 
           <section className="schedule-layout">
@@ -266,6 +322,11 @@ export default function Calendar() {
                         onDrop={(event) => {
                           event.preventDefault();
                           moveDraggedBlock(day, event.clientY, event.currentTarget);
+                        }}
+                        onClick={(event) => {
+                          if (event.target === event.currentTarget) {
+                            openNewAtPosition(day, event.clientY, event.currentTarget);
+                          }
                         }}
                       >
                         {dayBlocks.map((block, blockIndex) => (
@@ -295,13 +356,35 @@ export default function Calendar() {
             </div>
           </section>
 
-          <form className="card schedule-form" onSubmit={submit}>
-            <p className="schedule-kicker">{editingId ? "植えたものを直す" : "畑に植える"}</p>
-            <label>
-              日付
-              <input type="date" value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value })} />
-            </label>
-            <div className="form-pair">
+          {formOpen && (
+            <div className="schedule-editor-backdrop" onClick={closeForm}>
+              <form className="schedule-editor" onSubmit={submit} onClick={(event) => event.stopPropagation()}>
+                <header>
+                  <div>
+                    <span>{editingId ? "予定を整える" : "新しい予定"}</span>
+                    <h2>{editingId ? form.title : "自分の時間を植える"}</h2>
+                  </div>
+                  <button type="button" className="editor-close" onClick={closeForm} title="閉じる">×</button>
+                </header>
+                <label>
+                  タイトル
+                  <input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} autoFocus />
+                </label>
+                <div className="editor-row">
+                  <label>
+                    日付
+                    <input type="date" value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value })} />
+                  </label>
+                  <label>
+                    種類
+                    <select value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })}>
+                      {SCHEDULE_CATEGORIES.map((category) => (
+                        <option value={category.key} key={category.key}>{category.label}</option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <div className="editor-row">
               <label>
                 開始
                 <input type="time" value={form.start_time} onChange={(event) => setForm({ ...form, start_time: event.target.value })} />
@@ -310,29 +393,18 @@ export default function Calendar() {
                 終了
                 <input type="time" value={form.end_time} onChange={(event) => setForm({ ...form, end_time: event.target.value })} />
               </label>
+                </div>
+                <label>
+                  メモ <small>任意</small>
+                  <textarea rows={2} value={form.note ?? ""} onChange={(event) => setForm({ ...form, note: event.target.value })} />
+                </label>
+                <div className="editor-actions">
+                  {editingId && <button type="button" className="schedule-btn danger" onClick={remove} disabled={saving}>削除</button>}
+                  <button className="schedule-btn primary" disabled={saving}>{editingId ? "変更を保存" : "予定を追加"}</button>
+                </div>
+              </form>
             </div>
-            <label>
-              タイトル
-              <input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} />
-            </label>
-            <label>
-              種類
-              <select value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })}>
-                {SCHEDULE_CATEGORIES.map((category) => (
-                  <option value={category.key} key={category.key}>{category.label}</option>
-                ))}
-              </select>
-            </label>
-            <label className="memo-field">
-              メモ
-              <textarea rows={3} value={form.note ?? ""} onChange={(event) => setForm({ ...form, note: event.target.value })} />
-            </label>
-            <div className="form-actions">
-              <button className="schedule-btn primary" disabled={saving}>{editingId ? "保存" : "追加"}</button>
-              {editingId && <button type="button" className="schedule-btn danger" onClick={remove} disabled={saving}>削除</button>}
-              {editingId && <button type="button" className="schedule-btn" onClick={() => setEditingId(null)}>解除</button>}
-            </div>
-          </form>
+          )}
         </>
       )}
 

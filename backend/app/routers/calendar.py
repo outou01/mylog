@@ -149,6 +149,11 @@ class WeekScheduleOut(BaseModel):
     blocks: list[ScheduleBlockOut]
 
 
+class ScheduleMessageOut(BaseModel):
+    message: str
+    is_fallback: bool
+
+
 class ScheduleBlockPayload(BaseModel):
     date: date
     start_time: str
@@ -243,16 +248,28 @@ def _fallback_schedule_message(today: date) -> str:
     return messages[today.toordinal() % len(messages)]
 
 
-def _generate_schedule_message(today: date) -> tuple[str, bool]:
+def _generate_schedule_message(today: date, blocks: list[ScheduleBlock]) -> tuple[str, bool]:
     from app.ai_client import chat
 
-    prompt = """
+    personal_blocks = [block for block in blocks if block.category != "work"]
+    total_minutes = sum(_minutes_between(block.start_time, block.end_time) for block in personal_blocks)
+    block_lines = "\n".join(
+        f"- {block.date} {block.start_time.strftime('%H:%M')}-{block.end_time.strftime('%H:%M')} {block.title}"
+        for block in personal_blocks[:12]
+    ) or "- まだ予定なし"
+    prompt = f"""
 あなたはライフダッシュボードのナビゲーター「アリア」です。
-仕事以外の時間を充実させる重要性を、短い格言のように日本語で1文だけ返してください。
+ユーザーの今週の仕事以外の予定を見て、本人の人生のための時間を大切にしたくなるコメントを返してください。
+
+仕事以外の予定: {len(personal_blocks)}件、合計{total_minutes / 60:.1f}時間
+{block_lines}
+
 条件:
-- 90文字以内
-- 説教ではなく、静かに前向き
-- 「仕事以外の時間」「自分の時間」「人生」のどれかに触れる
+- 100文字以内、2文まで
+- 予定があれば具体的な予定名か時間に触れて肯定する
+- 予定がなければ、責めずに30分の小さな枠を提案する
+- 仕事以外の時間が人生を作るという思想を、説教せず前向きに伝える
+- 「ご主人様」と呼ぶ
 - 引用符や箇条書きは不要
 """
     executor = ThreadPoolExecutor(max_workers=1)
@@ -269,7 +286,7 @@ def _generate_schedule_message(today: date) -> tuple[str, bool]:
         if future.done():
             executor.shutdown(wait=False, cancel_futures=True)
     if not raw:
-        message = f"{_fallback_schedule_message(today)} ※自動生成"
+        message = _fallback_schedule_message(today)
         is_fallback = True
     else:
         message = raw.strip().replace("\n", " ")[:120]
@@ -277,30 +294,11 @@ def _generate_schedule_message(today: date) -> tuple[str, bool]:
     return message, is_fallback
 
 
-def _schedule_message(today: date, db: Session) -> str:
+def _saved_schedule_message(today: date, db: Session) -> str:
     stored = db.query(ScheduleMessage).filter(ScheduleMessage.message_date == today).first()
     if stored and not stored.is_fallback:
         return stored.message
-    if stored and stored.updated_at:
-        elapsed = (datetime.now() - stored.updated_at).total_seconds()
-        if elapsed < 30 * 60:
-            return stored.message
-
-    message, is_fallback = _generate_schedule_message(today)
-    if stored:
-        stored.message = message
-        stored.is_fallback = is_fallback
-        db.commit()
-        return message
-
-    stored = ScheduleMessage(
-        message_date=today,
-        message=message,
-        is_fallback=is_fallback,
-    )
-    db.add(stored)
-    db.commit()
-    return message
+    return "今週の時間を見ながら、アリアに声をかけてみてください。"
 
 
 def _schedule_out(block: ScheduleBlock) -> ScheduleBlockOut:
@@ -610,9 +608,45 @@ def get_schedule_week(week_start: date | None = None, db: Session = Depends(get_
         week_end=end.isoformat(),
         day_start_hour=6,
         day_end_hour=24,
-        schedule_message=_schedule_message(today, db),
+        schedule_message=_saved_schedule_message(today, db),
         blocks=_work_blocks(start) + [_schedule_out(block) for block in blocks],
     )
+
+
+@router.post("/schedule-message", response_model=ScheduleMessageOut)
+def create_schedule_message(week_start: date | None = None, db: Session = Depends(get_db)):
+    today = date.today()
+    start = _week_start(week_start or today)
+    end = start + timedelta(days=6)
+    stored = db.query(ScheduleMessage).filter(ScheduleMessage.message_date == today).first()
+    if stored and not stored.is_fallback:
+        return ScheduleMessageOut(message=stored.message, is_fallback=False)
+    if stored and stored.is_fallback and stored.updated_at:
+        elapsed = (datetime.now() - stored.updated_at).total_seconds()
+        if elapsed < 30 * 60:
+            return ScheduleMessageOut(
+                message=stored.message.replace(" ※自動生成", ""),
+                is_fallback=True,
+            )
+
+    blocks = (
+        db.query(ScheduleBlock)
+        .filter(ScheduleBlock.date >= start, ScheduleBlock.date <= end)
+        .order_by(ScheduleBlock.date.asc(), ScheduleBlock.start_time.asc())
+        .all()
+    )
+    message, is_fallback = _generate_schedule_message(today, blocks)
+    if stored:
+        stored.message = message
+        stored.is_fallback = is_fallback
+    else:
+        db.add(ScheduleMessage(
+            message_date=today,
+            message=message,
+            is_fallback=is_fallback,
+        ))
+    db.commit()
+    return ScheduleMessageOut(message=message, is_fallback=is_fallback)
 
 
 @router.post("/schedule-blocks", response_model=ScheduleBlockOut, status_code=201)
