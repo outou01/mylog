@@ -104,7 +104,7 @@ function toPayload(block: ScheduleBlock): ScheduleBlockPayload {
   };
 }
 
-export default function Calendar() {
+export default function Calendar({ embedded = false }: { embedded?: boolean }) {
   const today = localDate();
   const [tab, setTab] = useState<Tab>("schedule");
   const [weekStart, setWeekStart] = useState(mondayOf(today));
@@ -252,10 +252,10 @@ export default function Calendar() {
 
   return (
     <div className="calendar-page">
-      <div className="cal-tabs">
+      {!embedded && <div className="cal-tabs">
         <button className={`cal-tab ${tab === "schedule" ? "active" : ""}`} onClick={() => setTab("schedule")}>🌱 今週の畑</button>
         <button className={`cal-tab ${tab === "hours" ? "active" : ""}`} onClick={() => setTab("hours")}>🌾 畑の成長</button>
-      </div>
+      </div>}
 
       {tab === "schedule" && schedule && (
         <>

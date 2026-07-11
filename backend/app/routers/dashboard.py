@@ -14,6 +14,8 @@ from app.models import (
     DailyLog,
     DashboardSetting,
     Dream,
+    HabitCheck,
+    InsightSeed,
     ScheduleBlock,
     SeedTask,
 )
@@ -125,6 +127,62 @@ class PurposeUpdate(BaseModel):
     text: str = Field(min_length=1, max_length=2000)
 
 
+class FocusAction(BaseModel):
+    kind: str
+    key: str
+    seed_id: int | None = None
+    icon: str
+    title: str
+    reason: str
+    standard_minutes: int
+    minimum_minutes: int
+    minimum_label: str
+
+
+class FocusHabit(BaseModel):
+    key: str
+    label: str
+    icon: str
+    status: str
+    standard_minutes: int
+    minimum_minutes: int
+    cue: str
+    completed_minutes: int
+
+
+class FocusField(BaseModel):
+    key: str
+    name: str
+    icon: str
+    color: str
+    score: int
+
+
+class FocusPrinciple(BaseModel):
+    id: int
+    icon: str
+    title: str
+    text: str
+
+
+class FocusHomeOut(BaseModel):
+    action: FocusAction
+    habits: list[FocusHabit]
+    fields: list[FocusField]
+    principle: FocusPrinciple
+
+
+class HabitCheckPayload(BaseModel):
+    minutes: int = Field(ge=0, le=480)
+
+
+class InsightSeedPayload(BaseModel):
+    title: str = Field(min_length=1, max_length=160)
+    insight: str = Field(min_length=1, max_length=4000)
+    personal_rule: str = Field(min_length=1, max_length=4000)
+    linked_actions: str = Field(default="", max_length=240)
+
+
 class ProjectPayload(BaseModel):
     title: str = Field(min_length=1, max_length=120)
     reason: str = Field(min_length=1, max_length=2000)
@@ -177,6 +235,80 @@ def _format_minutes(minutes: int) -> str:
     if rest == 0:
         return f"{hours}時間"
     return f"{hours}時間{rest}分"
+
+
+FOCUS_HABITS = {
+    "meditation": {
+        "label": "瞑想", "icon": "🧘", "standard": 5, "minimum": 1,
+        "minimum_label": "1分だけ静かに座る", "cue": "仕事終了後", "field": "mind",
+    },
+    "reading": {
+        "label": "読書", "icon": "📚", "standard": 15, "minimum": 2,
+        "minimum_label": "本を2ページだけ読む", "cue": "休憩か就寝前", "field": "knowledge",
+    },
+    "creation": {
+        "label": "創作", "icon": "🎨", "standard": 30, "minimum": 10,
+        "minimum_label": "続きを10分だけ開く", "cue": "自分の時間が始まったら", "field": "creation",
+    },
+}
+
+
+def _habit_is_due(key: str, weekday: int) -> bool:
+    if key == "meditation":
+        return True
+    if key == "reading":
+        return weekday in {0, 3, 6}
+    return weekday in {1, 2, 5}
+
+
+def _seed_focus_defaults(db: Session) -> None:
+    if db.query(InsightSeed).first():
+        return
+    db.add_all([
+        InsightSeed(
+            title="習慣は人生を味わうためにある",
+            insight="瞑想の時間を増やすこと自体が目的ではない。人生を穏やかに味わえる状態を作るために行う。",
+            personal_rule="生活を圧迫する習慣は、量を減らす。",
+            linked_actions="meditation,rest,reading",
+        ),
+        InsightSeed(
+            title="ダイヤモンドも掘り出さなければ見つからない",
+            insight="価値があるだけでは、人には伝わらない。掘り出し、磨き、陳列し、届ける必要がある。",
+            personal_rule="創作したら、外へ出すところまでを一つの循環とする。",
+            linked_actions="creation,social,publish",
+        ),
+    ])
+    db.commit()
+
+
+def _focus_habits(db: Session, today: date) -> list[FocusHabit]:
+    checks = {
+        row.habit_key: row
+        for row in db.query(HabitCheck).filter(HabitCheck.check_date == today).all()
+    }
+    result = []
+    for key, definition in FOCUS_HABITS.items():
+        check = checks.get(key)
+        due = _habit_is_due(key, today.weekday())
+        if check and check.minutes >= definition["standard"]:
+            status = "done"
+        elif check and check.minutes > 0:
+            status = "minimum"
+        elif due:
+            status = "today"
+        else:
+            status = "off"
+        result.append(FocusHabit(
+            key=key,
+            label=definition["label"],
+            icon=definition["icon"],
+            status=status,
+            standard_minutes=definition["standard"],
+            minimum_minutes=definition["minimum"],
+            cue=definition["cue"],
+            completed_minutes=check.minutes if check else 0,
+        ))
+    return result
 
 
 def _minutes_between(start, end) -> int:
@@ -390,143 +522,174 @@ JSONのみ（顔文字はfaceにだけ入れ、messageには入れない）:
     return result
 
 
-@router.get("/home", response_model=DashboardHomeOut)
-def get_dashboard_home(db: Session = Depends(get_db)):
+@router.get("/focus", response_model=FocusHomeOut)
+def get_focus_home(db: Session = Depends(get_db)):
     today = date.today()
-    start = _week_start(today)
-    purpose = _get_purpose(db)
+    hour = datetime.now().hour
+    habits = _focus_habits(db, today)
 
-    # ── 自分の畑: 完了済みScheduleBlockが唯一の実績時間 ──
-    weekly_minutes = _completed_self_minutes(db, start, today)
-    progress_percent = _clamp_percent((weekly_minutes / SELF_TARGET_MINUTES) * 100)
-    total_minutes = _total_self_minutes(db)
-    level, level_title, next_title, next_remaining = _field_level(total_minutes)
-    streak = _streak_days(db, today)
+    from app.routers.soil import CATEGORIES as SOIL_CATEGORIES, _compute_field_scores
+    scores, _ = _compute_field_scores(db)
+    fields = [FocusField(
+        key=item["key"], name=item["name"], icon=item["icon"], color=item["color"],
+        score=scores[item["key"]],
+    ) for item in SOIL_CATEGORIES]
+    score_by_key = {field.key: field.score for field in fields}
 
     latest_log = db.query(DailyLog).order_by(DailyLog.date.desc()).first()
     today_log = latest_log if latest_log and latest_log.date == today else None
-
-    if weekly_minutes == 0:
-        if today_log and today_log.energy_level == 1:
-            field_message = "疲れている日は休むのも畑仕事のうちです。畑は逃げません。"
-        elif streak > 0:
-            field_message = f"{streak}日続いています。今日も10分だけ耕せば、途切れません。"
-        else:
-            field_message = "10分だけ耕せば、ここに刻まれます。"
-    else:
-        field_message = f"今週は{_format_minutes(weekly_minutes)}、自分の畑を耕しました。"
-
-    # ── 続きから: 種（SeedTask）ベース ──
-    current_seed_row = (
+    current_seed = (
         db.query(SeedTask)
         .filter(SeedTask.status.in_(["planted", "active"]))
-        .order_by(
-            (SeedTask.status == "planted").desc(),
-            SeedTask.updated_at.desc(),
-        )
+        .order_by((SeedTask.status == "planted").desc(), SeedTask.updated_at.desc())
         .first()
     )
-    current_seed = _seed_summary(current_seed_row, today, db) if current_seed_row else None
+    planted_seed_ids = {
+        row[0] for row in db.query(ScheduleBlock.seed_task_id).filter(
+            ScheduleBlock.date == today,
+            ScheduleBlock.seed_task_id.is_not(None),
+        ).all()
+    }
+    today_categories = {
+        row[0] for row in db.query(ScheduleBlock.category).filter(ScheduleBlock.date == today).all()
+    }
 
-    other_seeds = (
-        db.query(SeedTask)
-        .filter(
-            SeedTask.status.in_(["planted", "active"]),
-            SeedTask.id != (current_seed_row.id if current_seed_row else -1),
+    due_undone = [
+        habit for habit in habits if habit.status == "today"
+    ]
+    due_undone.sort(key=lambda habit: score_by_key.get(FOCUS_HABITS[habit.key]["field"], 0))
+
+    if today_log and (today_log.energy_level == 1 or today_log.mood_score <= 2):
+        definition = FOCUS_HABITS["meditation"]
+        action = FocusAction(
+            kind="habit", key="meditation", icon=definition["icon"],
+            title=definition["minimum_label"],
+            reason="今日は増やす日ではなく、人生を圧迫しない形へ整える日です。",
+            standard_minutes=definition["standard"], minimum_minutes=definition["minimum"],
+            minimum_label=definition["minimum_label"],
         )
-        .order_by(SeedTask.updated_at.desc())
-        .limit(5)
-        .all()
-    )
-    seeds = [_seed_summary(s, today, db) for s in other_seeds]
-
-    # ── 人生ゲージ: 同一尺度（実測分数）で正直に ──
-    logs = (
-        db.query(DailyLog)
-        .filter(DailyLog.date >= start, DailyLog.date <= today)
-        .all()
-    )
-    overtime_minutes = round(sum((log.overtime_hours or 0) for log in logs) * 60)
-    elapsed_workdays = sum(
-        1 for offset in range((today - start).days + 1)
-        if (start + timedelta(days=offset)).weekday() < 5
-    )
-    work_minutes = elapsed_workdays * WORKDAY_MINUTES + overtime_minutes
-    has_data = weekly_minutes > 0 or len(logs) > 0
-    total = work_minutes + weekly_minutes
-    if has_data and total > 0:
-        work_percent = _clamp_percent(work_minutes / total * 100)
-        self_percent = _clamp_percent(weekly_minutes / total * 100)
-    else:
-        work_percent = 0
-        self_percent = 0
-
-    # ── タイムライン: 完了した畑仕事の実績 ──
-    completed_blocks = (
-        db.query(ScheduleBlock)
-        .filter(ScheduleBlock.completed.is_(True), ScheduleBlock.category.in_(SELF_CATEGORIES))
-        .order_by(ScheduleBlock.date.desc(), ScheduleBlock.start_time.desc())
-        .limit(8)
-        .all()
-    )
-    if completed_blocks:
-        timeline = [
-            TimelineItem(
-                date_label=_date_label(b.date, today),
-                title=b.title,
-                note=f"{CATEGORY_LABEL.get(b.category, b.category)} {_format_minutes(_minutes_between(b.start_time, b.end_time))}",
-            )
-            for b in reversed(completed_blocks)
-        ]
-    else:
-        # 実績がまだ無い間は旧プロジェクト履歴を表示
-        events = (
-            db.query(ActiveProjectEvent)
-            .order_by(ActiveProjectEvent.event_date.desc(), ActiveProjectEvent.id.desc())
-            .limit(8)
-            .all()
+    elif today.weekday() == 6 and hour < 12 and "workout" not in today_categories:
+        action = FocusAction(
+            kind="calendar", key="workout", icon="💪", title="朝のジム",
+            reason="身体を整えたら、その後の今日は自由です。",
+            standard_minutes=60, minimum_minutes=10, minimum_label="10分だけ身体を動かす",
         )
-        timeline = [
-            TimelineItem(date_label=_date_label(e.event_date, today), title=e.title, note=e.note)
-            for e in reversed(events)
-        ]
+    elif hour >= 22 and due_undone:
+        habit = due_undone[0]
+        definition = FOCUS_HABITS[habit.key]
+        action = FocusAction(
+            kind="habit", key=habit.key, icon=habit.icon,
+            title=definition["minimum_label"],
+            reason="もう遅い時間です。最低ラインだけで、今日は十分です。",
+            standard_minutes=habit.standard_minutes, minimum_minutes=habit.minimum_minutes,
+            minimum_label=definition["minimum_label"],
+        )
+    elif current_seed and current_seed.id not in planted_seed_ids and today.weekday() in {2, 5}:
+        action = FocusAction(
+            kind="seed", key=current_seed.category, seed_id=current_seed.id,
+            icon="💎" if current_seed.category == "creation" else "🌱",
+            title=current_seed.title,
+            reason=current_seed.purpose or "夢を、今日の小さな行動へ変えます。",
+            standard_minutes=current_seed.estimated_minutes,
+            minimum_minutes=min(10, current_seed.estimated_minutes),
+            minimum_label=f"{min(10, current_seed.estimated_minutes)}分だけ続きを開く",
+        )
+    elif due_undone:
+        habit = due_undone[0]
+        definition = FOCUS_HABITS[habit.key]
+        action = FocusAction(
+            kind="habit", key=habit.key, icon=habit.icon,
+            title=f"{habit.label}を{habit.standard_minutes}分",
+            reason="習慣のために人生を削らず、今日に馴染む量だけ行います。",
+            standard_minutes=habit.standard_minutes, minimum_minutes=habit.minimum_minutes,
+            minimum_label=definition["minimum_label"],
+        )
+    elif current_seed and current_seed.id not in planted_seed_ids:
+        action = FocusAction(
+            kind="seed", key=current_seed.category, seed_id=current_seed.id,
+            icon="💎" if current_seed.category == "creation" else "🌱",
+            title=current_seed.title,
+            reason=current_seed.purpose or "夢を、今日の小さな行動へ変えます。",
+            standard_minutes=current_seed.estimated_minutes,
+            minimum_minutes=min(10, current_seed.estimated_minutes),
+            minimum_label=f"{min(10, current_seed.estimated_minutes)}分だけ続きを開く",
+        )
+    else:
+        action = FocusAction(
+            kind="rest", key="rest", icon="🌙", title="今日はもう自由です",
+            reason="必要な畑仕事は終わっています。余白も人生の一部です。",
+            standard_minutes=0, minimum_minutes=0, minimum_label="休む",
+        )
 
-    from app.routers.soil import compute_soil
-    soil_status = compute_soil(db)
-
-    try:
-        aria = _build_aria(purpose, current_seed_row, latest_log, weekly_minutes, progress_percent)
-    except Exception as exc:
-        print(f"[Dashboard] Aria home message fallback: {exc}")
-        aria = _fallback_aria(latest_log, weekly_minutes, current_seed_row)
-
-    return DashboardHomeOut(
-        soil=SoilBrief(state=soil_status.state, label=soil_status.label, comment=soil_status.comment),
-        field=FieldSummary(
-            weekly_minutes=weekly_minutes,
-            progress_percent=progress_percent,
-            message=field_message,
-            total_minutes=total_minutes,
-            level=level,
-            level_title=level_title,
-            next_title=next_title,
-            next_remaining_minutes=next_remaining,
-            streak_days=streak,
-        ),
-        purpose=PurposeSummary(text=purpose),
-        current_seed=current_seed,
-        seeds=seeds,
-        life_gauge=LifeGaugeSummary(
-            work_percent=work_percent,
-            self_percent=self_percent,
-            work_minutes=work_minutes if has_data else 0,
-            self_minutes=weekly_minutes,
-            has_data=has_data,
-        ),
-        timeline=timeline,
-        aria=aria,
-        aria_message=aria.message,
+    _seed_focus_defaults(db)
+    principle = (
+        db.query(InsightSeed)
+        .filter(InsightSeed.is_active.is_(True), InsightSeed.linked_actions.contains(action.key))
+        .order_by(InsightSeed.updated_at.desc())
+        .first()
+        or db.query(InsightSeed).filter(InsightSeed.is_active.is_(True)).order_by(InsightSeed.id.asc()).first()
     )
+    principle_icon = "💎" if principle and "ダイヤモンド" in principle.title else "🧘"
+
+    return FocusHomeOut(
+        action=action,
+        habits=habits,
+        fields=fields,
+        principle=FocusPrinciple(
+            id=principle.id,
+            icon=principle_icon,
+            title=principle.title,
+            text=principle.insight,
+        ),
+    )
+
+
+@router.put("/focus/habits/{habit_key}", response_model=FocusHabit)
+def update_focus_habit(habit_key: str, payload: HabitCheckPayload, db: Session = Depends(get_db)):
+    if habit_key not in FOCUS_HABITS:
+        raise HTTPException(status_code=404, detail="Habit not found")
+    today = date.today()
+    row = db.query(HabitCheck).filter(
+        HabitCheck.habit_key == habit_key,
+        HabitCheck.check_date == today,
+    ).first()
+    if row:
+        row.minutes = payload.minutes
+    else:
+        row = HabitCheck(habit_key=habit_key, check_date=today, minutes=payload.minutes)
+        db.add(row)
+    db.commit()
+    definition = FOCUS_HABITS[habit_key]
+    status = "done" if payload.minutes >= definition["standard"] else "minimum" if payload.minutes > 0 else "today"
+    return FocusHabit(
+        key=habit_key, label=definition["label"], icon=definition["icon"], status=status,
+        standard_minutes=definition["standard"], minimum_minutes=definition["minimum"],
+        cue=definition["cue"], completed_minutes=payload.minutes,
+    )
+
+
+@router.get("/focus/insights", response_model=list[FocusPrinciple])
+def list_focus_insights(db: Session = Depends(get_db)):
+    _seed_focus_defaults(db)
+    rows = db.query(InsightSeed).filter(InsightSeed.is_active.is_(True)).order_by(InsightSeed.id.asc()).all()
+    return [FocusPrinciple(
+        id=row.id,
+        icon="💎" if "ダイヤモンド" in row.title else "🧘",
+        title=row.title,
+        text=row.insight,
+    ) for row in rows]
+
+
+@router.post("/focus/insights", response_model=FocusPrinciple, status_code=201)
+def create_focus_insight(payload: InsightSeedPayload, db: Session = Depends(get_db)):
+    row = InsightSeed(
+        title=payload.title, insight=payload.insight, personal_rule=payload.personal_rule,
+        linked_actions=payload.linked_actions,
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return FocusPrinciple(id=row.id, icon="💎", title=row.title, text=row.insight)
 
 
 @router.patch("/purpose", response_model=PurposeSummary)

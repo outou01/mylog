@@ -341,5 +341,49 @@ export interface DashboardHome {
 export const fetchDashboardHome = () =>
   api.get<DashboardHome>("/dashboard/home").then((r) => r.data);
 
+export interface FocusAction {
+  kind: "habit" | "seed" | "calendar" | "rest" | string;
+  key: string;
+  seed_id: number | null;
+  icon: string;
+  title: string;
+  reason: string;
+  standard_minutes: number;
+  minimum_minutes: number;
+  minimum_label: string;
+}
+
+export interface FocusHabit {
+  key: string;
+  label: string;
+  icon: string;
+  status: "done" | "minimum" | "today" | "off" | string;
+  standard_minutes: number;
+  minimum_minutes: number;
+  cue: string;
+  completed_minutes: number;
+}
+
+export interface FocusField {
+  key: string;
+  name: string;
+  icon: string;
+  color: string;
+  score: number;
+}
+
+export interface FocusHome {
+  action: FocusAction;
+  habits: FocusHabit[];
+  fields: FocusField[];
+  principle: { id: number; icon: string; title: string; text: string };
+}
+
+export const fetchFocusHome = () =>
+  api.get<FocusHome>("/dashboard/focus").then((r) => r.data);
+
+export const updateFocusHabit = (key: string, minutes: number) =>
+  api.put<FocusHabit>(`/dashboard/focus/habits/${key}`, { minutes }).then((r) => r.data);
+
 export const updateDashboardPurpose = (text: string) =>
   api.patch<{ text: string }>("/dashboard/purpose", { text }).then((r) => r.data);

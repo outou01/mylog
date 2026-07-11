@@ -1,127 +1,65 @@
-import { FormEvent, ReactNode, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  DashboardHome,
-  fetchDashboardHome,
-  HomeSeed,
-  updateDashboardPurpose,
+  fetchFocusHome,
+  FocusHabit,
+  FocusHome,
+  updateFocusHabit,
 } from "../api/client";
-import { completeSeed, plantSeed } from "../api/dreams";
+import { plantSeed } from "../api/dreams";
+import Calendar from "./Calendar";
 import "./Dashboard.css";
 
-const LEVEL_ICON: Record<number, string> = {
-  1: "🟫", 2: "🌱", 3: "🌿", 4: "🍀", 5: "🌾", 6: "🏞️",
+const STATUS_MARK: Record<string, string> = {
+  done: "✓",
+  minimum: "🌱",
+  today: "○",
+  off: "―",
 };
 
-// 土壌の状態で変わるアリアの褒め言葉（数字はいじらない、言葉の演出だけ）
-const PRAISE_LINES: Record<string, string[]> = {
-  rich: [
-    "土が良いので作物がつやつやです✨ さすがご主人様！",
-    "肥えた畑は正直ですね。今日の実り、とても綺麗です✨",
-    "良い土に良い種、良いご主人様。完璧な収穫です✨",
-  ],
-  ok: [
-    "今日もちゃんと収穫できましたね。アリアは見てましたよ🌾",
-    "着実な畑仕事、かっこいいです。この積み重ねが大農園への道です🌾",
-    "うん、良い手つきでした。土も少しずつ肥えてきています🌾",
-  ],
-  dry: [
-    "乾いた土で耕したご主人様は、本当に立派です🏅",
-    "疲れている日の10分は、元気な日の1時間に匹敵します🏅 誇ってください",
-    "こんな日にも畑に出たこと、アリアは絶対に忘れません🏅",
-  ],
-  unknown: [
-    "見事な畑仕事でした！アリアは嬉しいです✨",
-    "今日の一歩、確かに刻まれました🌾",
-  ],
-};
-
-function pickPraise(soilState: string): string {
-  const pool = PRAISE_LINES[soilState] ?? PRAISE_LINES.unknown;
-  return pool[Math.floor(Math.random() * pool.length)];
-}
-
-function ProgressBar({ value, tone = "field" }: { value: number; tone?: "field" | "work" | "self" }) {
-  const safeValue = Math.max(0, Math.min(100, value));
-  return (
-    <div className={`meter meter-${tone}`} aria-label={`${safeValue}%`}>
-      <div className="meter-fill" style={{ width: `${safeValue}%` }} />
-    </div>
-  );
-}
-
-function formatMinutes(minutes: number) {
-  const hours = Math.floor(minutes / 60);
-  const rest = minutes % 60;
-  if (hours === 0) return `${rest}分`;
-  if (rest === 0) return `${hours}時間`;
-  return `${hours}時間${rest}分`;
-}
-
-function Foldable({ title, children, defaultOpen = false }: { title: string; children: ReactNode; defaultOpen?: boolean }) {
-  const [open, setOpen] = useState(defaultOpen);
-  return (
-    <section className={`home-card foldable ${open ? "open" : ""}`}>
-      <button type="button" className="foldable-head" onClick={() => setOpen((v) => !v)}>
-        <p className="eyebrow">{title}</p>
-        <span className="foldable-arrow">{open ? "▲" : "▼"}</span>
-      </button>
-      {open && <div className="foldable-body">{children}</div>}
-    </section>
-  );
+function fieldLabel(score: number) {
+  if (score >= 80) return "よく育っている";
+  if (score >= 60) return "安定している";
+  if (score >= 40) return "芽が伸びている";
+  if (score >= 20) return "芽が出ている";
+  return "これから育つ";
 }
 
 export default function Dashboard() {
-  const [home, setHome] = useState<DashboardHome | null>(null);
-  const [error, setError] = useState(false);
-  const [celebrating, setCelebrating] = useState<{ title: string; minutes: number; praise: string } | null>(null);
-  const [purposeDraft, setPurposeDraft] = useState("");
-  const [editingPurpose, setEditingPurpose] = useState(false);
+  const [home, setHome] = useState<FocusHome | null>(null);
+  const [selectedHabit, setSelectedHabit] = useState<FocusHabit | null>(null);
+  const [actionOpen, setActionOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(false);
 
-  const loadHome = async () => {
-    const data = await fetchDashboardHome();
+  const load = async () => {
+    const data = await fetchFocusHome();
     setHome(data);
-    setPurposeDraft(data.purpose.text);
     setError(false);
   };
 
   useEffect(() => {
-    loadHome().catch(() => setError(true));
+    load().catch(() => setError(true));
   }, []);
 
-  const savePurpose = async (event: FormEvent) => {
-    event.preventDefault();
+  const recordHabit = async (habit: FocusHabit, minutes: number) => {
     setSaving(true);
     try {
-      await updateDashboardPurpose(purposeDraft);
-      await loadHome();
-      setEditingPurpose(false);
+      await updateFocusHabit(habit.key, minutes);
+      setSelectedHabit(null);
+      setActionOpen(false);
+      await load();
     } finally {
       setSaving(false);
     }
   };
 
-  const handlePlant = async (seed: HomeSeed) => {
+  const startSeed = async () => {
+    if (!home?.action.seed_id) return;
     setSaving(true);
     try {
-      await plantSeed(seed.id);
-      await loadHome();
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleComplete = async (seed: HomeSeed) => {
-    setSaving(true);
-    try {
-      await completeSeed(seed.id);
-      setCelebrating({
-        title: seed.title,
-        minutes: seed.estimated_minutes,
-        praise: pickPraise(home?.soil.state ?? "unknown"),
-      });
-      await loadHome();
+      await plantSeed(home.action.seed_id);
+      await load();
     } finally {
       setSaving(false);
     }
@@ -129,237 +67,136 @@ export default function Dashboard() {
 
   if (error) {
     return (
-      <div className="home-shell">
-        <section className="home-card aria-panel">
-          <div className="aria-avatar normal">
-            <div className="aria-face">(＾ω＾)</div>
-            <div className="aria-name">アリア</div>
-          </div>
-          <p className="aria-line">ご主人様、今日は30分だけ、自分の畑を耕しませんか？</p>
-        </section>
-      </div>
+      <main className="focus-home focus-empty">
+        <span>🌱</span>
+        <h1>今日は小さな一手だけで十分です</h1>
+        <p>ホームを読み込めませんでした。畑は逃げないので、少し時間を置いてください。</p>
+      </main>
     );
   }
 
   if (!home) {
-    return (
-      <div className="home-shell">
-        <section className="home-card loading-panel">
-          <p className="eyebrow">読み込み中</p>
-          <div className="loading-line" />
-          <div className="loading-line short" />
-        </section>
-      </div>
-    );
+    return <main className="focus-home focus-loading">今日の一手を選んでいます...</main>;
   }
 
-  const seed = home.current_seed;
-  const field = home.field;
+  const actionHabit = home.habits.find((habit) => habit.key === home.action.key);
 
   return (
-    <div className="home-shell home-shell-focus">
-      {celebrating && (
-        <div className="victory-overlay" onClick={() => setCelebrating(null)}>
-          <div className="victory-popup">
-            <div className="victory-emoji">🎉</div>
-            <div className="victory-headline">今日クリア！</div>
-            <div className="victory-cond">「{celebrating.title}」</div>
-            <div className="victory-harvest">🌾 +{celebrating.minutes}分の収穫！</div>
-            <div className="victory-praise">
-              <span className="victory-praise-face">(ﾉ´∀｀)ﾉ アリア</span>
-              {celebrating.praise}
-            </div>
-            <div className="victory-sub">タップで閉じる</div>
+    <main className="focus-home">
+      <section className="focus-action" style={{ "--action-color": home.action.key === "creation" ? "#a970d6" : "#79b780" } as React.CSSProperties}>
+        <div className="focus-action-copy">
+          <p className="focus-kicker">今日の一手</p>
+          <div className="focus-action-title">
+            <span>{home.action.icon}</span>
+            <h1>{home.action.title}</h1>
           </div>
-        </div>
-      )}
-
-      {/* ── 主役: アリアが今日のクエストを手渡す ── */}
-      <section className="home-card quest-hero">
-        <div className={`quest-aria aria-${home.aria.mood}`}>
-          <div className={`aria-avatar ${home.aria.mood}`}>
-            <div className="aria-face">{home.aria.face}</div>
-            <div className="aria-name">{home.aria.name}</div>
-          </div>
-          <p className="aria-line">{home.aria.message}</p>
+          <p className="focus-reason">{home.action.reason}</p>
+          {home.action.minimum_minutes > 0 && (
+            <p className="focus-minimum">最低ライン：{home.action.minimum_label}</p>
+          )}
         </div>
 
-        {seed ? (
-          <div className="quest-body">
-            <p className="eyebrow">🎯 今日のクエスト</p>
-            <h1 className="quest-title">
-              {seed.dream_icon && <span className="seed-dream-icon">{seed.dream_icon}</span>}
-              {seed.title}
-            </h1>
-            <div className="continue-meta">
-              {seed.dream_title && <span>🌌 {seed.dream_title}</span>}
-              <span>{seed.category_label}</span>
-              {seed.section && <span>{seed.section}</span>}
-              <span>推定 {seed.estimated_minutes}分</span>
-              <span>最後: {seed.last_touched_label}</span>
-              {seed.planted_today && seed.today_time && <span className="planted-chip">🌱 今日 {seed.today_time}</span>}
-            </div>
-            {seed.purpose && <p className="quest-purpose">{seed.purpose}</p>}
-            {home.soil.state === "dry" && (
-              <p className="quest-soil-hint">🏜️ 土が乾いています。今日は10分だけでも十分です。</p>
+        {home.action.kind === "habit" && actionHabit && (
+          <div className="focus-action-control">
+            {!actionOpen ? (
+              <button type="button" className="focus-primary" onClick={() => setActionOpen(true)}>始める</button>
+            ) : (
+              <div className="focus-complete-choices">
+                <span>できた量を選ぶ</span>
+                <button type="button" onClick={() => recordHabit(actionHabit, home.action.minimum_minutes)} disabled={saving}>
+                  最低 {home.action.minimum_minutes}分
+                </button>
+                <button type="button" className="primary" onClick={() => recordHabit(actionHabit, home.action.standard_minutes)} disabled={saving}>
+                  標準 {home.action.standard_minutes}分
+                </button>
+              </div>
             )}
-            <div className="quest-actions">
-              {!seed.planted_today && (
-                <button className="continue-button" onClick={() => handlePlant(seed)} disabled={saving}>
-                  🌱 今日に植える（{seed.estimated_minutes}分）
-                </button>
-              )}
-              <button
-                className={seed.planted_today ? "continue-button" : "console-button quest-done-sub"}
-                onClick={() => handleComplete(seed)}
-                disabled={saving}
-              >
-                ✅ 達成した！
-              </button>
-            </div>
           </div>
-        ) : (
-          <div className="quest-body">
-            <p className="eyebrow">🎯 今日のクエスト</p>
-            <p className="support-text">植えられる種がありません。種リストで次の一手を用意しましょう。</p>
-            <div className="quest-actions">
-              <Link to="/seeds" className="continue-button">種リストへ</Link>
+        )}
+        {home.action.kind === "seed" && (
+          <button type="button" className="focus-primary" onClick={startSeed} disabled={saving}>今日に植える</button>
+        )}
+        {home.action.kind === "calendar" && (
+          <Link className="focus-primary" to="/calendar">時間を決める</Link>
+        )}
+      </section>
+
+      <section className="daily-shape">
+        <header>
+          <div>
+            <p className="focus-kicker">今日の型</p>
+            <h2>全部ではなく、今日の分だけ</h2>
+          </div>
+          <span>○ 今日　✓ 完了　― 対象外</span>
+        </header>
+        <div className="habit-line">
+          {home.habits.map((habit) => (
+            <button
+              type="button"
+              className={`habit-item ${habit.status} ${selectedHabit?.key === habit.key ? "selected" : ""}`}
+              key={habit.key}
+              onClick={() => setSelectedHabit(selectedHabit?.key === habit.key ? null : habit)}
+            >
+              <span>{habit.icon}</span>
+              <strong>{habit.label}</strong>
+              <em>{STATUS_MARK[habit.status] ?? "○"}</em>
+            </button>
+          ))}
+        </div>
+        {selectedHabit && (
+          <div className="habit-detail">
+            <div>
+              <strong>{selectedHabit.icon} {selectedHabit.label}</strong>
+              <span>標準 {selectedHabit.standard_minutes}分 ・ 最低 {selectedHabit.minimum_minutes}分 ・ {selectedHabit.cue}</span>
             </div>
+            {selectedHabit.status !== "off" && (
+              <div>
+                <button type="button" onClick={() => recordHabit(selectedHabit, selectedHabit.minimum_minutes)} disabled={saving}>最低ライン</button>
+                <button type="button" onClick={() => recordHabit(selectedHabit, selectedHabit.standard_minutes)} disabled={saving}>完了</button>
+              </div>
+            )}
           </div>
         )}
       </section>
 
-      {/* ── 畑の様子: 累計は絶対に減らない ── */}
-      <section className="home-card field-status">
-        <div className="field-status-row">
-          <div className="field-status-item">
-            <span className="field-status-icon">{LEVEL_ICON[field.level] ?? "🌱"}</span>
-            <div>
-              <strong>Lv.{field.level} {field.level_title}</strong>
-              <span>累計 {formatMinutes(field.total_minutes)}</span>
+      <section className="home-field">
+        <header>
+          <p className="focus-kicker">今週の畑</p>
+          <Link to="/calendar">詳しく見る →</Link>
+        </header>
+        <div className="home-field-list">
+          {home.fields.map((field) => (
+            <div className="home-field-row" key={field.key}>
+              <span className="home-field-name">{field.icon} {field.name}</span>
+              <div className="home-field-track">
+                <div style={{ width: `${field.score}%`, background: field.color }} />
+              </div>
+              <strong>{field.score}</strong>
+              <small>{fieldLabel(field.score)}</small>
             </div>
-          </div>
-          <div className="field-status-item">
-            <span className="field-status-icon">🔥</span>
-            <div>
-              <strong>{field.streak_days}日連続</strong>
-              <span>畑仕事</span>
-            </div>
-          </div>
-          <div className="field-status-item">
-            <span className="field-status-icon">⏱</span>
-            <div>
-              <strong>{formatMinutes(field.weekly_minutes)}</strong>
-              <span>今週</span>
-            </div>
-          </div>
-          <Link to="/private/soil" className="field-status-item field-status-link">
-            <span className="field-status-icon">{home.soil.state === "rich" ? "🌱" : home.soil.state === "dry" ? "🏜️" : home.soil.state === "ok" ? "🌍" : "🌫️"}</span>
-            <div>
-              <strong>{home.soil.label}</strong>
-              <span>土壌</span>
-            </div>
-          </Link>
+          ))}
         </div>
-        {field.next_title && field.next_remaining_minutes != null && (
-          <div className="field-next">
-            <ProgressBar
-              value={100 - (field.next_remaining_minutes / Math.max(1, field.next_remaining_minutes + field.total_minutes)) * 100}
-            />
-            <span>「{field.next_title}」まであと{formatMinutes(field.next_remaining_minutes)}</span>
-          </div>
-        )}
-        <p className="support-text">{field.message}</p>
       </section>
 
-      {/* ── 折りたたみ: 見たい時だけ ── */}
-      <Foldable title="🎯 総合目標">
-        <div className="section-head">
-          <span />
-          <button className="console-button" onClick={() => setEditingPurpose((v) => !v)}>
-            {editingPurpose ? "閉じる" : "編集"}
-          </button>
+      <section className="daily-principle">
+        <span>{home.principle.icon}</span>
+        <div>
+          <p className="focus-kicker">今日の原則</p>
+          <h2>{home.principle.title}</h2>
+          <p>{home.principle.text}</p>
         </div>
-        {editingPurpose ? (
-          <form className="console-form" onSubmit={savePurpose}>
-            <textarea value={purposeDraft} onChange={(event) => setPurposeDraft(event.target.value)} rows={4} />
-            <div className="form-actions">
-              <button className="console-button primary" disabled={saving}>保存</button>
-            </div>
-          </form>
-        ) : (
-          <div className="purpose-lines">
-            {home.purpose.text.split("\n").map((line) => (
-              <p key={line}>{line}</p>
-            ))}
-          </div>
-        )}
-      </Foldable>
+      </section>
 
-      {home.seeds.length > 0 && (
-        <Foldable title="🌰 他の種">
-          <div className="project-list">
-            {home.seeds.map((item) => (
-              <div className="project-row" key={item.id}>
-                <div>
-                  <strong>
-                    {item.dream_icon && `${item.dream_icon} `}
-                    {item.title}
-                  </strong>
-                  <span>{item.category_label}{item.section ? ` / ${item.section}` : ""} ・ {item.estimated_minutes}分</span>
-                </div>
-                <button className="console-button" disabled={saving || item.planted_today} onClick={() => handlePlant(item)}>
-                  {item.planted_today ? "植え済み" : "植える"}
-                </button>
-              </div>
-            ))}
+      <section className="home-calendar">
+        <header>
+          <div>
+            <p className="focus-kicker">今週の予定</p>
+            <h2>時刻に意味があるものだけ</h2>
           </div>
-          <div className="form-actions" style={{ marginTop: "0.8rem" }}>
-            <Link to="/seeds" className="console-button">種リストへ</Link>
-          </div>
-        </Foldable>
-      )}
-
-      <Foldable title="⚖ 人生ゲージ（今週の実測）">
-        {home.life_gauge.has_data ? (
-          <div className="life-gauges">
-            <div className="life-gauge-row">
-              <div className="gauge-label">
-                <span>仕事 {formatMinutes(home.life_gauge.work_minutes)}</span>
-                <strong>{home.life_gauge.work_percent}%</strong>
-              </div>
-              <ProgressBar value={home.life_gauge.work_percent} tone="work" />
-            </div>
-            <div className="life-gauge-row">
-              <div className="gauge-label">
-                <span>自分 {formatMinutes(home.life_gauge.self_minutes)}</span>
-                <strong>{home.life_gauge.self_percent}%</strong>
-              </div>
-              <ProgressBar value={home.life_gauge.self_percent} tone="self" />
-            </div>
-          </div>
-        ) : (
-          <p className="support-text">今週の記録がまだありません。畑を耕すか、ログを書くとここに実測が出ます。</p>
-        )}
-      </Foldable>
-
-      <Foldable title="🌾 畑タイムライン">
-        {home.timeline.length > 0 ? (
-          <ol className="timeline-list">
-            {home.timeline.map((item) => (
-              <li key={`${item.date_label}-${item.title}`}>
-                <time>{item.date_label}</time>
-                <div>
-                  <strong>{item.title}</strong>
-                  {item.note && <p>{item.note}</p>}
-                </div>
-              </li>
-            ))}
-          </ol>
-        ) : (
-          <p className="support-text">完了した畑仕事がここに刻まれていきます。</p>
-        )}
-      </Foldable>
-    </div>
+          <Link to="/calendar">カレンダーを開く →</Link>
+        </header>
+        <Calendar embedded />
+      </section>
+    </main>
   );
 }

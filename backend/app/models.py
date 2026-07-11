@@ -1,5 +1,5 @@
 from datetime import date, datetime, time as time_type
-from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text, Time, func
+from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text, Time, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -276,5 +276,30 @@ class SoilActionLog(Base):
     duration_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
     source_type: Mapped[str] = mapped_column(String(20), default="manual")
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+class HabitCheck(Base):
+    __tablename__ = "habit_checks"
+    __table_args__ = (UniqueConstraint("habit_key", "check_date", name="uq_habit_check_day"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    habit_key: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    check_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    minutes: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+class InsightSeed(Base):
+    __tablename__ = "insight_seeds"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    title: Mapped[str] = mapped_column(String(160), nullable=False)
+    insight: Mapped[str] = mapped_column(Text, nullable=False)
+    personal_rule: Mapped[str] = mapped_column(Text, nullable=False)
+    linked_actions: Mapped[str] = mapped_column(String(240), nullable=False, default="")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
