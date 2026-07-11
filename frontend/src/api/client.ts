@@ -255,6 +255,7 @@ export interface SoilLogEntry {
   performed_on: string;
   date_label: string;
   duration_minutes: number | null;
+  source_type: "manual" | "calendar" | string;
 }
 
 export interface SoilFieldCard {

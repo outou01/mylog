@@ -995,11 +995,17 @@
 .seed-category-stack {
   display: grid;
   gap: 1rem;
-  margin-top: 1rem;
+  margin-top: 0;
+}
+
+.seed-tree-page > .seed-tree-head,
+.seed-tree-page > .plant-message,
+.seed-tree-page > .seed-tree-toolbar {
+  display: none;
 }
 
 .seed-category-panel {
-  overflow: hidden;
+  overflow: visible;
 }
 
 .seed-category-panel > header {
@@ -1154,6 +1160,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.28rem;
+  position: relative;
 }
 
 .seed-tree-actions button {
@@ -1171,9 +1178,31 @@
   font-size: 0.72rem;
 }
 
+.seed-action-menu-button {
+  min-width: 56px;
+}
+
+.seed-action-menu {
+  display: grid;
+  gap: 0.25rem;
+  width: 112px;
+}
+
+.seed-action-menu button {
+  justify-content: flex-start;
+  text-align: left;
+  width: 100%;
+}
+
+.seed-action-menu .danger {
+  border-color: rgba(240, 105, 105, 0.38);
+  color: #ffb0a8;
+}
+
 .seed-note-toggle {
   border-color: rgba(118, 148, 199, 0.38);
   color: #9fb7e6;
+  min-width: 76px;
 }
 
 .seed-note-row td {
@@ -1314,7 +1343,7 @@
 .seed-tree-actions {
   flex-wrap: nowrap;
   justify-content: flex-start;
-  overflow-x: auto;
+  overflow-x: visible;
 }
 
 .seed-tree-actions button {
@@ -1325,9 +1354,17 @@
   padding: 0.28rem 0.38rem;
 }
 
-.seed-tree-actions button:last-of-type {
-  border-color: color-mix(in srgb, var(--category-accent) 42%, transparent);
-  color: #f1d899;
+.seed-action-menu-button {
+  border-color: color-mix(in srgb, var(--category-accent) 42%, transparent) !important;
+  color: #f1d899 !important;
+}
+
+.seed-action-menu {
+  margin-top: 0.25rem;
+}
+
+.seed-action-menu .danger {
+  color: #ffb0a8;
 }
 
 .seed-note-toggle {
@@ -1364,8 +1401,8 @@
 
 .seed-tree-table td:nth-child(1) { width: 64px; }
 .seed-tree-table td:nth-child(2) { width: auto; }
-.seed-tree-table td:nth-child(3) { width: 86px; }
-.seed-tree-table td:nth-child(4) { width: 292px; }
+.seed-tree-table td:nth-child(3) { width: 104px; }
+.seed-tree-table td:nth-child(4) { width: 132px; }
 
 .seed-tree-table-wrap {
   overflow-x: visible;
@@ -1389,6 +1426,6 @@
   line-height: 1.1;
 }
 
-.seed-tree-actions button:last-of-type {
-  margin-left: auto;
+.seed-action-menu button {
+  width: 100%;
 }

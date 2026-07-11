@@ -4,7 +4,6 @@ import {
   createSeed,
   deleteSeed,
   fetchSeeds,
-  plantSeed,
   SeedPayload,
   SeedTask,
   updateSeed,
@@ -137,7 +136,7 @@ export default function Seeds() {
   const [keyword, setKeyword] = useState("");
   const [message, setMessage] = useState("");
   const [savingId, setSavingId] = useState<number | null>(null);
-  const [plantingId, setPlantingId] = useState<number | null>(null);
+  const [openActionMenu, setOpenActionMenu] = useState<number | null>(null);
 
   const load = async () => {
     const data = await fetchSeeds();
@@ -325,18 +324,7 @@ export default function Seeds() {
       return next;
     });
     setMessage(parent ? "子Todoを追加しました。" : "Todoを追加しました。");
-  };
-
-  const plant = async (seed: SeedTask) => {
-    await save(seed);
-    setPlantingId(seed.id);
-    try {
-      const planted = await plantSeed(seed.id);
-      setMessage(`${seed.title} を ${planted.start_time}-${planted.end_time} に追加しました。`);
-      await load();
-    } finally {
-      setPlantingId(null);
-    }
+    setOpenActionMenu(null);
   };
 
   const complete = async (seed: SeedTask) => {
@@ -344,11 +332,13 @@ export default function Seeds() {
     const saved = await completeSeed(seed.id, draft.actual_minutes || draft.estimated_minutes);
     setSeeds((current) => current.map((item) => (item.id === seed.id ? saved : item)));
     setDrafts((current) => ({ ...current, [seed.id]: toPayload(saved) }));
+    setOpenActionMenu(null);
   };
 
   const remove = async (seed: SeedTask) => {
     await deleteSeed(seed.id);
     setSeeds((current) => current.filter((item) => item.id !== seed.id));
+    setOpenActionMenu(null);
   };
 
   const toggleSet = (setter: Dispatch<SetStateAction<Set<number>>>, id: number) => {
@@ -388,15 +378,25 @@ export default function Seeds() {
         </td>
         <td>
           <button className="seed-note-toggle" type="button" onClick={() => toggleSet(setExpandedNotes, seed.id)}>
-            {isExpanded ? "閉じる" : "表示"}
+            {isExpanded ? "詳細を閉じる" : "詳細表示"}
           </button>
         </td>
         <td>
           <div className="seed-tree-actions">
-            <button type="button" onClick={() => addTodo(draft.category, normalizeSection(draft.section), seed)}>子追加</button>
-            <button type="button" onClick={() => complete(seed)} disabled={draft.status === "done"}>完了</button>
-            <button type="button" onClick={() => remove(seed)}>削除</button>
-            <button type="button" onClick={() => plant(seed)} disabled={plantingId === seed.id || draft.status === "done"}>カレンダーに追加</button>
+            <button
+              className="seed-action-menu-button"
+              type="button"
+              onClick={() => setOpenActionMenu((current) => (current === seed.id ? null : seed.id))}
+            >
+              操作
+            </button>
+            {openActionMenu === seed.id && (
+              <div className="seed-action-menu">
+                <button type="button" onClick={() => addTodo(draft.category, normalizeSection(draft.section), seed)}>子Todo追加</button>
+                <button type="button" onClick={() => complete(seed)} disabled={draft.status === "done"}>完了にする</button>
+                <button className="danger" type="button" onClick={() => remove(seed)}>削除</button>
+              </div>
+            )}
             {savingId === seed.id && <span>保存中</span>}
           </div>
         </td>

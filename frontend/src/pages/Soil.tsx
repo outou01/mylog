@@ -23,6 +23,7 @@ export default function Soil() {
   const [customName, setCustomName] = useState("");
   const [customCategory, setCustomCategory] = useState("creation");
   const [customMinutes, setCustomMinutes] = useState(15);
+  const [showAllActions, setShowAllActions] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
   const [ariaComment, setAriaComment] = useState<string | null>(null);
   const [ariaThinking, setAriaThinking] = useState(false);
@@ -112,6 +113,10 @@ export default function Soil() {
     key,
     defs: actions.filter((a) => a.category_key === key && a.is_quick),
   }));
+  const recommendedField = [...summary.categories].sort((a, b) => a.score - b.score)[0];
+  const recommendedAction =
+    actions.find((action) => action.category_key === recommendedField?.key && action.is_quick) ??
+    actions.find((action) => action.is_quick);
 
   return (
     <div className="soil-page">
@@ -195,8 +200,25 @@ export default function Soil() {
 
       {/* ── クイック追加 ── */}
       <section className="card soil-quick-card">
-        <p className="soil-kicker">🌱 耕したことを記録</p>
-        {quickByCategory.map(({ key, defs }) => defs.length > 0 && (
+        <p className="soil-kicker">今日のおすすめ</p>
+        <div className="soil-recommend-box">
+          <div>
+            <strong>{recommendedField?.name ?? "自分の畑"}に水をあげる</strong>
+            <span>{recommendedField?.suggestion ?? "5分だけ耕す"}</span>
+          </div>
+          {recommendedAction && (
+            <button className="soil-usual-btn" onClick={() => quickAdd(recommendedAction)} disabled={saving}>
+              {recommendedAction.icon} {recommendedAction.name}
+              {recommendedAction.default_minutes ? ` ${recommendedAction.default_minutes}分` : ""}
+            </button>
+          )}
+        </div>
+
+        <button className="soil-adjust-btn soil-custom-toggle" onClick={() => setShowAllActions((current) => !current)}>
+          {showAllActions ? "候補を閉じる" : "別の行動を記録"}
+        </button>
+
+        {showAllActions && quickByCategory.map(({ key, defs }) => defs.length > 0 && (
           <div className="soil-quick-group" key={key}>
             <span className="soil-quick-label">{CATEGORY_LABEL[key]}</span>
             <div className="soil-chip-row">
@@ -210,7 +232,7 @@ export default function Soil() {
           </div>
         ))}
 
-        {addingCustom ? (
+        {showAllActions && (addingCustom ? (
           <form className="soil-custom-form" onSubmit={submitCustom}>
             <input
               placeholder="やったこと（例: 皿洗い）"
@@ -245,7 +267,7 @@ export default function Soil() {
           <button className="soil-adjust-btn soil-custom-toggle" onClick={() => setAddingCustom(true)}>
             ＋ その他の行動を記録
           </button>
-        )}
+        ))}
       </section>
 
       {/* ── 最近耕したこと ── */}
@@ -260,8 +282,10 @@ export default function Soil() {
                   {log.action_name}
                   {log.duration_minutes ? ` ${log.duration_minutes}分` : ""}
                 </span>
-                <span className="soil-recent-cat">{log.category_name}</span>
-                <button className="soil-recent-delete" onClick={() => removeLog(log.id)} disabled={saving} title="削除">×</button>
+                <span className="soil-recent-cat">{log.source_type === "calendar" ? "カレンダー" : log.category_name}</span>
+                {log.source_type !== "calendar" && (
+                  <button className="soil-recent-delete" onClick={() => removeLog(log.id)} disabled={saving} title="削除">×</button>
+                )}
               </li>
             ))}
           </ul>

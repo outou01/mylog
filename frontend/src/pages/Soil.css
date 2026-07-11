@@ -461,6 +461,39 @@
   padding: 1.1rem 1.2rem;
 }
 
+.soil-recommend-box {
+  align-items: center;
+  border: 1px solid rgba(216, 176, 95, 0.22);
+  border-radius: 8px;
+  background: rgba(216, 176, 95, 0.07);
+  display: grid;
+  gap: 0.8rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 0.85rem;
+}
+
+.soil-recommend-box strong {
+  color: #f5eddc;
+  display: block;
+  font-size: 0.98rem;
+  margin-bottom: 0.25rem;
+}
+
+.soil-recommend-box span {
+  color: #b8c7b4;
+  display: block;
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
+.soil-recommend-box .soil-usual-btn {
+  margin-top: 0;
+  min-height: 42px;
+  padding: 0 1rem;
+  white-space: nowrap;
+  width: auto;
+}
+
 .soil-quick-group {
   margin-top: 0.7rem;
 }
@@ -565,4 +598,14 @@
 
 .soil-recent-delete:hover {
   color: #ef7070;
+}
+
+@media (max-width: 640px) {
+  .soil-recommend-box {
+    grid-template-columns: 1fr;
+  }
+
+  .soil-recommend-box .soil-usual-btn {
+    width: 100%;
+  }
 }

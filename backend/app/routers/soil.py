@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.ai_client import chat, parse_json
 from app.database import get_db
-from app.models import DailyLog
+from app.models import DailyLog, ScheduleBlock
 from app.schemas import DailyLogOut
 
 router = APIRouter(prefix="/soil", tags=["soil"])
@@ -159,7 +159,7 @@ def get_soil_aria_comment(db: Session = Depends(get_db)):
     for c in CATEGORIES:
         recent = by_category[c["key"]][:2]
         recent_text = "、".join(
-            f"{_date_label(l.performed_on)}に{l.action_name}" for l in recent
+            f"{_date_label(event['performed_on'])}に{event['action_name']}" for event in recent
         ) or "行動なし"
         score_lines.append(f"- {c['name']}: {scores[c['key']]}/100（{recent_text}）")
 
@@ -319,6 +319,31 @@ SUGGESTIONS = {
     "life": "机の上だけ片付ける",
 }
 
+SCHEDULE_CATEGORY_TO_SOIL = {
+    "workout": "body",
+    "creation": "creation",
+    "job_search": "knowledge",
+    "social": "mind",
+    "life": "life",
+    "rest": "mind",
+}
+
+TITLE_KEYWORD_TO_SOIL = [
+    ("body", ["筋トレ", "ジム", "リングフィット", "散歩", "ストレッチ", "運動"]),
+    ("knowledge", ["読書", "学習", "技術", "資格", "勉強", "本"]),
+    ("creation", ["創作", "小説", "シナリオ", "プロット", "開発", "ゲーム制作", "同人"]),
+    ("mind", ["瞑想", "日記", "休憩", "内省", "交流"]),
+    ("life", ["掃除", "洗濯", "片付", "準備", "就寝", "家事"]),
+]
+
+SCHEDULE_BASE_SCORE = {
+    "body": 25,
+    "knowledge": 25,
+    "creation": 25,
+    "mind": 15,
+    "life": 15,
+}
+
 DEFAULT_ACTIONS = [
     # (name, category, base_score, default_minutes, icon, sort)
     ("ジム", "body", 45, 60, "🏋️", 1),
@@ -370,6 +395,7 @@ class SoilLogOut(BaseModel):
     performed_on: str
     date_label: str
     duration_minutes: int | None
+    source_type: str = "manual"
 
 
 class RecentAction(BaseModel):
@@ -439,35 +465,106 @@ def _log_out(log: SoilActionLog) -> SoilLogOut:
         performed_on=log.performed_on.isoformat(),
         date_label=_date_label(log.performed_on),
         duration_minutes=log.duration_minutes,
+        source_type=log.source_type or "manual",
     )
 
 
-def _compute_field_scores(db: Session) -> tuple[dict[str, int], dict[str, list[SoilActionLog]]]:
+def _minutes_between(start, end) -> int:
+    return max(0, (end.hour * 60 + end.minute) - (start.hour * 60 + start.minute))
+
+
+def _schedule_soil_category(block: ScheduleBlock) -> str | None:
+    if block.category in SCHEDULE_CATEGORY_TO_SOIL:
+        return SCHEDULE_CATEGORY_TO_SOIL[block.category]
+    text = f"{block.title} {block.note or ''}"
+    for category_key, keywords in TITLE_KEYWORD_TO_SOIL:
+        if any(keyword in text for keyword in keywords):
+            return category_key
+    return None
+
+
+def _schedule_event(block: ScheduleBlock) -> dict | None:
+    category = _schedule_soil_category(block)
+    if not category:
+        return None
+    return {
+        "id": -block.id,
+        "action_name": block.title,
+        "category_key": category,
+        "performed_on": block.date,
+        "duration_minutes": _minutes_between(block.start_time, block.end_time),
+        "source_type": "calendar",
+        "base_score": SCHEDULE_BASE_SCORE.get(category, 12),
+        "default_minutes": 30,
+    }
+
+
+def _manual_event(log: SoilActionLog, defs: dict[int, SoilActionDefinition]) -> dict:
+    definition = defs.get(log.action_definition_id) if log.action_definition_id else None
+    return {
+        "id": log.id,
+        "action_name": log.action_name,
+        "category_key": log.category_key,
+        "performed_on": log.performed_on,
+        "duration_minutes": log.duration_minutes,
+        "source_type": log.source_type or "manual",
+        "base_score": definition.base_score if definition else 12,
+        "default_minutes": definition.default_minutes if definition else None,
+    }
+
+
+def _event_out(event: dict) -> SoilLogOut:
+    return SoilLogOut(
+        id=event["id"],
+        action_name=event["action_name"],
+        category_key=event["category_key"],
+        category_name=CATEGORY_NAME.get(event["category_key"], event["category_key"]),
+        performed_on=event["performed_on"].isoformat(),
+        date_label=_date_label(event["performed_on"]),
+        duration_minutes=event["duration_minutes"],
+        source_type=event["source_type"],
+    )
+
+
+def _soil_events(db: Session, start: date | None = None, end: date | None = None) -> list[dict]:
+    defs = {d.id: d for d in db.query(SoilActionDefinition).all()}
+    manual_query = db.query(SoilActionLog)
+    calendar_query = db.query(ScheduleBlock).filter(ScheduleBlock.category != "work")
+    if start:
+        manual_query = manual_query.filter(SoilActionLog.performed_on >= start)
+        calendar_query = calendar_query.filter(ScheduleBlock.date >= start)
+    if end:
+        manual_query = manual_query.filter(SoilActionLog.performed_on <= end)
+        calendar_query = calendar_query.filter(ScheduleBlock.date <= end)
+
+    events = [_manual_event(log, defs) for log in manual_query.all() if log.category_key in CATEGORY_KEYS]
+    for block in calendar_query.all():
+        event = _schedule_event(block)
+        if event:
+            events.append(event)
+    return sorted(events, key=lambda item: (item["performed_on"], abs(item["id"])), reverse=True)
+
+
+def _compute_field_scores(db: Session) -> tuple[dict[str, int], dict[str, list[dict]]]:
     today = date.today()
     start = today - timedelta(days=6)
-    logs = (
-        db.query(SoilActionLog)
-        .filter(SoilActionLog.performed_on >= start, SoilActionLog.performed_on <= today)
-        .order_by(SoilActionLog.performed_on.desc(), SoilActionLog.id.desc())
-        .all()
-    )
-    defs = {d.id: d for d in db.query(SoilActionDefinition).all()}
+    events = _soil_events(db, start=start, end=today)
 
     # (category, day) ごとの生スコアを集め、日次上限をかけてから新しさ係数を掛ける
     day_raw: dict[tuple[str, date], float] = {}
-    by_category: dict[str, list[SoilActionLog]] = {c["key"]: [] for c in CATEGORIES}
-    for log in logs:
-        if log.category_key not in CATEGORY_KEYS:
+    by_category: dict[str, list[dict]] = {c["key"]: [] for c in CATEGORIES}
+    for event in events:
+        category_key = event["category_key"]
+        if category_key not in CATEGORY_KEYS:
             continue
-        by_category[log.category_key].append(log)
-        definition = defs.get(log.action_definition_id) if log.action_definition_id else None
-        base = definition.base_score if definition else 12
-        default_min = definition.default_minutes if definition else None
-        if log.duration_minutes and default_min:
-            factor = max(0.3, min(2.0, log.duration_minutes / default_min))
+        by_category[category_key].append(event)
+        base = event["base_score"]
+        default_min = event["default_minutes"]
+        if event["duration_minutes"] and default_min:
+            factor = max(0.3, min(2.0, event["duration_minutes"] / default_min))
         else:
             factor = 1.0
-        key = (log.category_key, log.performed_on)
+        key = (category_key, event["performed_on"])
         day_raw[key] = day_raw.get(key, 0.0) + base * factor
 
     scores: dict[str, float] = {c["key"]: 0.0 for c in CATEGORIES}
@@ -533,19 +630,14 @@ def get_soil_summary(db: Session = Depends(get_db)):
             score=scores[c["key"]],
             label=_score_label(scores[c["key"]]),
             recent=[RecentAction(
-                date_label=_date_label(l.performed_on),
-                name=l.action_name,
-                duration_minutes=l.duration_minutes,
-            ) for l in cat_logs],
+                date_label=_date_label(event["performed_on"]),
+                name=event["action_name"],
+                duration_minutes=event["duration_minutes"],
+            ) for event in cat_logs],
             suggestion=SUGGESTIONS[c["key"]],
         ))
 
-    recent = (
-        db.query(SoilActionLog)
-        .order_by(SoilActionLog.performed_on.desc(), SoilActionLog.id.desc())
-        .limit(10)
-        .all()
-    )
+    recent = _soil_events(db)[:10]
 
     headline, note = _build_headline(scores)
     overall = round(sum(scores.values()) / len(scores))
@@ -555,7 +647,7 @@ def get_soil_summary(db: Session = Depends(get_db)):
         overall_score=overall,
         overall_note=note,
         categories=cards,
-        recent_logs=[_log_out(l) for l in recent],
+        recent_logs=[_event_out(event) for event in recent],
         aria_message=_rule_based_aria(scores),
     )
 
