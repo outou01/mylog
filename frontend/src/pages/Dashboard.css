@@ -20,11 +20,11 @@
   align-items: end;
   gap: 2rem;
   overflow: hidden;
-  min-height: 290px;
+  min-height: 248px;
   border: 1px solid rgba(143, 198, 152, 0.28);
   border-bottom: 8px solid #5f442d;
   background: #12221c;
-  padding: clamp(1.4rem, 4vw, 3.2rem);
+  padding: clamp(1.35rem, 3.4vw, 2.7rem);
 }
 
 .focus-action::before,
@@ -193,7 +193,16 @@
 
 .habit-item > span { font-size: 1.1rem; }
 .habit-item strong { font-size: 0.86rem; }
-.habit-item em { color: #d8b05f; font-size: 1rem; font-style: normal; font-weight: 900; }
+.habit-item em {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: #9eaa9b;
+  font-size: 0.68rem;
+  font-style: normal;
+  white-space: nowrap;
+}
+.habit-item em b { color: #d8b05f; font-size: 1rem; }
 .habit-item.off { opacity: 0.52; }
 .habit-item.done { border-color: rgba(112, 190, 126, 0.34); }
 .habit-item.selected { outline: 1px solid rgba(216, 176, 95, 0.55); }
@@ -214,12 +223,14 @@
 .habit-detail strong { color: #f0eadf; font-size: 0.86rem; }
 .habit-detail span { color: #91a08e; font-size: 0.72rem; margin-top: 0.2rem; }
 .habit-detail > div:last-child { display: flex; gap: 0.4rem; }
+.connection-choices button:first-child { border-color: rgba(143, 198, 152, 0.35); }
+.connection-choices button:last-child { border-color: rgba(216, 176, 95, 0.5); }
 
 .home-field > header { margin-bottom: 0.65rem; }
 .home-field-list { border: 1px solid rgba(232, 220, 195, 0.12); border-radius: 8px; overflow: hidden; }
 .home-field-row {
   display: grid;
-  grid-template-columns: 100px minmax(120px, 1fr) 36px 110px;
+  grid-template-columns: 110px minmax(120px, 1fr) 36px 100px 104px;
   align-items: center;
   gap: 0.8rem;
   min-height: 48px;
@@ -231,6 +242,28 @@
 .home-field-track > div { height: 100%; border-radius: inherit; }
 .home-field-row > strong { color: #e6f0e2; font-family: var(--font-mono); font-size: 0.82rem; text-align: right; }
 .home-field-row > small { color: #859481; font-size: 0.68rem; }
+.connection-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: #a7b4a3;
+  font-size: 0.68rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.connection-state::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #647168;
+}
+.connection-state.hot::before { background: #e5b95f; box-shadow: 0 0 0 3px rgba(229, 185, 95, 0.1); }
+.connection-state.warm::before,
+.connection-state.connected::before { background: #76b982; }
+.connection-state.reconnect { color: #d5a985; }
+.connection-state.reconnect::before { background: #d98261; }
+.connection-state.new::before { background: #7b8f84; }
 
 .daily-principle {
   display: grid;
@@ -251,7 +284,9 @@
 }
 
 .daily-principle h2 { color: #f4eddf; font-size: 1.18rem; margin: 0.25rem 0 0; }
-.daily-principle div > p:last-child { max-width: 780px; color: #aebbaa; line-height: 1.7; margin: 0.45rem 0 0; }
+.daily-principle details { margin-top: 0.5rem; }
+.daily-principle summary { color: #899789; cursor: pointer; font-size: 0.72rem; }
+.daily-principle details p { max-width: 780px; color: #aebbaa; line-height: 1.7; margin: 0.5rem 0 0; }
 
 .home-calendar > .calendar-page { margin-top: 1rem; }
 .home-calendar .cal-tabs { display: none; }
@@ -262,14 +297,15 @@
 .focus-loading { color: #aebbaa; }
 
 @media (max-width: 760px) {
-  .focus-action { grid-template-columns: 1fr; min-height: 340px; }
+  .focus-action { grid-template-columns: 1fr; min-height: 310px; }
   .focus-action h1 { font-size: 2.2rem; }
   .focus-primary { width: 100%; }
   .focus-complete-choices { width: 100%; }
   .habit-line { grid-template-columns: 1fr; }
   .habit-detail { align-items: stretch; flex-direction: column; }
   .habit-detail > div:last-child button { flex: 1; }
-  .home-field-row { grid-template-columns: 86px 1fr 32px; gap: 0.5rem; }
-  .home-field-row > small { grid-column: 2 / -1; }
+  .home-field-row { grid-template-columns: 96px 1fr 32px; gap: 0.5rem; }
+  .home-field-row > small { display: none; }
+  .connection-state { grid-column: 2 / -1; }
   .daily-shape > header { align-items: flex-start; flex-direction: column; }
 }

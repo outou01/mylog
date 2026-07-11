@@ -370,6 +370,9 @@ export interface FocusField {
   icon: string;
   color: string;
   score: number;
+  connection_label: string;
+  connection_tone: "hot" | "warm" | "connected" | "reconnect" | "new";
+  days_since_touch: number | null;
 }
 
 export interface FocusHome {

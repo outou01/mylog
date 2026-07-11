@@ -156,6 +156,9 @@ class FocusField(BaseModel):
     icon: str
     color: str
     score: int
+    connection_label: str
+    connection_tone: str
+    days_since_touch: int | None
 
 
 class FocusPrinciple(BaseModel):
@@ -309,6 +312,18 @@ def _focus_habits(db: Session, today: date) -> list[FocusHabit]:
             completed_minutes=check.minutes if check else 0,
         ))
     return result
+
+
+def _connection_state(days_since: int | None) -> tuple[str, str]:
+    if days_since == 0:
+        return "今日触れた", "hot"
+    if days_since == 1:
+        return "まだ温かい", "warm"
+    if days_since is not None and days_since <= 3:
+        return "接続中", "connected"
+    if days_since is not None:
+        return "再接続しよう", "reconnect"
+    return "今日つなごう", "new"
 
 
 def _minutes_between(start, end) -> int:
@@ -529,11 +544,20 @@ def get_focus_home(db: Session = Depends(get_db)):
     habits = _focus_habits(db, today)
 
     from app.routers.soil import CATEGORIES as SOIL_CATEGORIES, _compute_field_scores
-    scores, _ = _compute_field_scores(db)
-    fields = [FocusField(
-        key=item["key"], name=item["name"], icon=item["icon"], color=item["color"],
-        score=scores[item["key"]],
-    ) for item in SOIL_CATEGORIES]
+    scores, by_category = _compute_field_scores(db)
+    field_order = {"body": 0, "mind": 1, "knowledge": 2, "creation": 3, "life": 4}
+    fields = []
+    for item in sorted(SOIL_CATEGORIES, key=lambda category: field_order.get(category["key"], 99)):
+        recent = by_category[item["key"]]
+        days_since = (today - recent[0]["performed_on"]).days if recent else None
+        connection_label, connection_tone = _connection_state(days_since)
+        fields.append(FocusField(
+            key=item["key"],
+            name="発信・交流" if item["key"] == "life" else item["name"],
+            icon=item["icon"], color=item["color"], score=scores[item["key"]],
+            connection_label=connection_label, connection_tone=connection_tone,
+            days_since_touch=days_since,
+        ))
     score_by_key = {field.key: field.score for field in fields}
 
     latest_log = db.query(DailyLog).order_by(DailyLog.date.desc()).first()
@@ -557,7 +581,11 @@ def get_focus_home(db: Session = Depends(get_db)):
     due_undone = [
         habit for habit in habits if habit.status == "today"
     ]
-    due_undone.sort(key=lambda habit: score_by_key.get(FOCUS_HABITS[habit.key]["field"], 0))
+    days_by_key = {field.key: field.days_since_touch for field in fields}
+    due_undone.sort(key=lambda habit: (
+        -(days_by_key.get(FOCUS_HABITS[habit.key]["field"]) or 0),
+        score_by_key.get(FOCUS_HABITS[habit.key]["field"], 0),
+    ))
 
     if today_log and (today_log.energy_level == 1 or today_log.mood_score <= 2):
         definition = FOCUS_HABITS["meditation"]

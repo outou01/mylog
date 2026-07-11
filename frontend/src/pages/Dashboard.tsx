@@ -17,6 +17,40 @@ const STATUS_MARK: Record<string, string> = {
   off: "―",
 };
 
+const HABIT_COPY: Record<string, { label: string; choices: { label: string; minutes: number }[] }> = {
+  meditation: {
+    label: "心を整える",
+    choices: [
+      { label: "1分呼吸する", minutes: 1 },
+      { label: "5分整える", minutes: 5 },
+      { label: "10分座る", minutes: 10 },
+    ],
+  },
+  reading: {
+    label: "知識に触れる",
+    choices: [
+      { label: "2ページ読む", minutes: 2 },
+      { label: "10分読む", minutes: 10 },
+      { label: "30分読む", minutes: 30 },
+    ],
+  },
+  creation: {
+    label: "創作に触れる",
+    choices: [
+      { label: "5分だけ触れる", minutes: 5 },
+      { label: "15分進める", minutes: 15 },
+      { label: "集中してやる", minutes: 30 },
+    ],
+  },
+};
+
+const STATUS_LABEL: Record<string, string> = {
+  done: "接続済み",
+  minimum: "つながった",
+  today: "今日つなぐ",
+  off: "休息日",
+};
+
 function fieldLabel(score: number) {
   if (score >= 80) return "よく育っている";
   if (score >= 60) return "安定している";
@@ -80,6 +114,7 @@ export default function Dashboard() {
   }
 
   const actionHabit = home.habits.find((habit) => habit.key === home.action.key);
+  const selectedCopy = selectedHabit ? HABIT_COPY[selectedHabit.key] : null;
 
   return (
     <main className="focus-home">
@@ -117,7 +152,7 @@ export default function Dashboard() {
           <button type="button" className="focus-primary" onClick={startSeed} disabled={saving}>今日に植える</button>
         )}
         {home.action.kind === "calendar" && (
-          <Link className="focus-primary" to="/calendar">時間を決める</Link>
+          <Link className="focus-primary" to="/calendar">今週の予定に入れる</Link>
         )}
       </section>
 
@@ -127,7 +162,7 @@ export default function Dashboard() {
             <p className="focus-kicker">今日の型</p>
             <h2>全部ではなく、今日の分だけ</h2>
           </div>
-          <span>○ 今日　✓ 完了　― 対象外</span>
+          <span>○ 今日つなぐ　✓ 接続済み　― 休息日</span>
         </header>
         <div className="habit-line">
           {home.habits.map((habit) => (
@@ -138,21 +173,24 @@ export default function Dashboard() {
               onClick={() => setSelectedHabit(selectedHabit?.key === habit.key ? null : habit)}
             >
               <span>{habit.icon}</span>
-              <strong>{habit.label}</strong>
-              <em>{STATUS_MARK[habit.status] ?? "○"}</em>
+              <strong>{HABIT_COPY[habit.key]?.label ?? habit.label}</strong>
+              <em><b>{STATUS_MARK[habit.status] ?? "○"}</b>{STATUS_LABEL[habit.status]}</em>
             </button>
           ))}
         </div>
         {selectedHabit && (
           <div className="habit-detail">
             <div>
-              <strong>{selectedHabit.icon} {selectedHabit.label}</strong>
-              <span>標準 {selectedHabit.standard_minutes}分 ・ 最低 {selectedHabit.minimum_minutes}分 ・ {selectedHabit.cue}</span>
+              <strong>{selectedHabit.icon} {selectedCopy?.label ?? selectedHabit.label}</strong>
+              <span>少し触れるだけでも、明日の再開が軽くなります。</span>
             </div>
             {selectedHabit.status !== "off" && (
-              <div>
-                <button type="button" onClick={() => recordHabit(selectedHabit, selectedHabit.minimum_minutes)} disabled={saving}>最低ライン</button>
-                <button type="button" onClick={() => recordHabit(selectedHabit, selectedHabit.standard_minutes)} disabled={saving}>完了</button>
+              <div className="connection-choices">
+                {(selectedCopy?.choices ?? []).map((choice) => (
+                  <button type="button" key={choice.label} onClick={() => recordHabit(selectedHabit, choice.minutes)} disabled={saving}>
+                    {choice.label}
+                  </button>
+                ))}
               </div>
             )}
           </div>
@@ -173,6 +211,7 @@ export default function Dashboard() {
               </div>
               <strong>{field.score}</strong>
               <small>{fieldLabel(field.score)}</small>
+              <span className={`connection-state ${field.connection_tone}`}>{field.connection_label}</span>
             </div>
           ))}
         </div>
@@ -183,7 +222,10 @@ export default function Dashboard() {
         <div>
           <p className="focus-kicker">今日の原則</p>
           <h2>{home.principle.title}</h2>
-          <p>{home.principle.text}</p>
+          <details>
+            <summary>続きを読む</summary>
+            <p>{home.principle.text}</p>
+          </details>
         </div>
       </section>
 
