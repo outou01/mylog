@@ -1,9 +1,8 @@
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import {
   createSoilLog,
   deleteSoilLog,
   fetchSoilActions,
-  fetchSoilAriaComment,
   fetchSoilSummary,
   SoilActionDef,
   SoilSummary,
@@ -25,10 +24,6 @@ export default function Soil() {
   const [customMinutes, setCustomMinutes] = useState(15);
   const [showAllActions, setShowAllActions] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
-  const [ariaComment, setAriaComment] = useState<string | null>(null);
-  const [ariaThinking, setAriaThinking] = useState(false);
-  const [ariaFailed, setAriaFailed] = useState(false);
-  const lastAriaFetch = useRef(0);
 
   const load = async () => {
     const [s, a] = await Promise.all([fetchSoilSummary(), fetchSoilActions()]);
@@ -83,28 +78,6 @@ export default function Soil() {
     }
   };
 
-  const askAria = async () => {
-    if (ariaThinking) return;
-    if (ariaComment && Date.now() - lastAriaFetch.current < 3 * 60 * 1000) return;
-    setAriaThinking(true);
-    setAriaFailed(false);
-    try {
-      const result = await fetchSoilAriaComment();
-      if (result.is_ai) {
-        setAriaComment(result.message);
-        lastAriaFetch.current = Date.now();
-      } else {
-        setAriaFailed(true);
-        setTimeout(() => setAriaFailed(false), 4000);
-      }
-    } catch {
-      setAriaFailed(true);
-      setTimeout(() => setAriaFailed(false), 4000);
-    } finally {
-      setAriaThinking(false);
-    }
-  };
-
   if (!summary) {
     return <div className="soil-page"><p className="soil-muted">読み込み中...</p></div>;
   }
@@ -117,89 +90,39 @@ export default function Soil() {
   const recommendedAction =
     actions.find((action) => action.category_key === recommendedField?.key && action.is_quick) ??
     actions.find((action) => action.is_quick);
+  const recentLogs = summary.recent_logs.slice(0, 5);
 
   return (
     <div className="soil-page">
 
       {flash && <div className="soil-flash">{flash}</div>}
 
-      {/* ── 今日の一言 ── */}
-      <section className="card soil-headline-card">
-        <p className="soil-subtitle">自分の畑を、毎日少しずつ耕す。</p>
-        <h2 className="soil-headline">{summary.headline}</h2>
-        <div
-          className={`soil-aria-bubble ${ariaComment ? "ai" : ""} ${ariaThinking ? "thinking" : ""}`}
-          onClick={askAria}
-          title="タップするとアリアが畑を見てコメントします"
-        >
-          <span className="soil-aria-face">
-            {ariaThinking ? "(・ω・ )?" : "(＾ω＾)"} アリア
-          </span>
-          <p>
-            {ariaThinking
-              ? "……（畑を観察中）"
-              : ariaFailed
-                ? "（電波が悪いみたいです…少ししたらまたタップしてください）"
-                : ariaComment
-                  ? `✨ ${ariaComment}`
-                  : summary.aria_message}
-          </p>
-          {!ariaComment && !ariaThinking && !ariaFailed && (
-            <span className="soil-aria-hint">タップでアリアに聞く</span>
-          )}
+      <section className="soil-minimal-head">
+        <div>
+          <p>土壌</p>
+          <h2>直近7日の畑</h2>
         </div>
+        <span>{summary.overall_score}%</span>
       </section>
 
-      {/* ── 5つの畑 ── */}
-      <div className="soil-fields-grid">
+      <section className="soil-field-list" aria-label="直近7日の畑の状態">
         {summary.categories.map((field) => (
-          <section className="card soil-field-card" key={field.key} style={{ borderLeftColor: field.color }}>
-            <div className="soil-field-head">
-              <span className="soil-field-icon" style={{ background: `${field.color}22` }}>{field.icon}</span>
-              <div>
-                <strong>{field.name}</strong>
-                <span className="soil-field-label">{field.label}</span>
+          <div className="soil-field-row" key={field.key}>
+            <div className="soil-field-main">
+              <span className="soil-field-name">{field.icon} {field.name}</span>
+              <div className="soil-bar-track">
+                <div className="soil-bar-fill" style={{ width: `${field.score}%`, background: field.color }} />
               </div>
-              <span className="soil-field-score">{field.score}</span>
             </div>
-            <div className="soil-bar-track">
-              <div className="soil-bar-fill" style={{ width: `${field.score}%`, background: field.color }} />
+            <div className="soil-field-side">
+              <strong>{field.score}%</strong>
+              <span>{field.label}</span>
             </div>
-            {field.recent.length > 0 ? (
-              <ul className="soil-field-recent">
-                {field.recent.map((r, i) => (
-                  <li key={i}>
-                    <span>{r.date_label}</span> {r.name}
-                    {r.duration_minutes ? ` ${r.duration_minutes}分` : ""}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="soil-field-empty">この7日はまだ静かです</p>
-            )}
-            <p className="soil-field-suggestion">💧 {field.suggestion}</p>
-          </section>
+          </div>
         ))}
+      </section>
 
-        {/* 全体の畑（補助表示） */}
-        <section className="card soil-field-card soil-overall-card">
-          <div className="soil-field-head">
-            <span className="soil-field-icon">🌾</span>
-            <div>
-              <strong>今週の自分の畑</strong>
-              <span className="soil-field-label">全体</span>
-            </div>
-            <span className="soil-field-score">{summary.overall_score}</span>
-          </div>
-          <div className="soil-bar-track">
-            <div className="soil-bar-fill" style={{ width: `${summary.overall_score}%` }} />
-          </div>
-          <p className="soil-field-suggestion">{summary.overall_note}</p>
-        </section>
-      </div>
-
-      {/* ── クイック追加 ── */}
-      <section className="card soil-quick-card">
+      <section className="soil-next-action">
         <p className="soil-kicker">今日のおすすめ</p>
         <div className="soil-recommend-box">
           <div>
@@ -270,12 +193,11 @@ export default function Soil() {
         ))}
       </section>
 
-      {/* ── 最近耕したこと ── */}
-      {summary.recent_logs.length > 0 && (
-        <section className="card soil-recent-card">
+      {recentLogs.length > 0 && (
+        <section className="soil-recent-card">
           <p className="soil-kicker">最近耕したこと</p>
           <ul className="soil-recent-list">
-            {summary.recent_logs.map((log) => (
+            {recentLogs.map((log) => (
               <li key={log.id}>
                 <span className="soil-recent-date">{log.date_label}</span>
                 <span className="soil-recent-name">
