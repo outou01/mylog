@@ -17,6 +17,7 @@ from app.models import (
     Dream,
     HabitCheck,
     InsightSeed,
+    ResumeNote,
     ScheduleBlock,
     SeedTask,
 )
@@ -171,10 +172,15 @@ class FocusHomeOut(BaseModel):
     habits: list[FocusHabit]
     fields: list[FocusField]
     principle: FocusPrinciple
+    creation_resume_note: str | None = None
 
 
 class HabitCheckPayload(BaseModel):
     minutes: int = Field(ge=0, le=480)
+
+
+class ResumeNotePayload(BaseModel):
+    note: str = Field(min_length=1, max_length=500)
 
 
 class InsightSeedPayload(BaseModel):
@@ -248,8 +254,8 @@ FOCUS_HABITS = {
         "minimum_label": "本を2ページだけ読む", "cue": "休憩か就寝前", "field": "knowledge",
     },
     "creation": {
-        "label": "創作", "icon": "🎨", "standard": 30, "minimum": 10,
-        "minimum_label": "続きを10分だけ開く", "cue": "自分の時間が始まったら", "field": "creation",
+        "label": "創作", "icon": "🎨", "standard": 30, "minimum": 5,
+        "minimum_label": "原稿を5分だけ開く", "cue": "自分の時間が始まったら", "field": "creation",
     },
 }
 
@@ -324,7 +330,7 @@ def _connection_state(category_key: str, days_since: int | None, weekday: int) -
     if category_key == "body" and weekday in {1, 6}:
         return "再接続できる", "reconnect"
     if category_key == "life" and days_since is None:
-        return "今週は静か", "quiet"
+        return "—", "quiet"
     if category_key == "body" and weekday not in {1, 6} and days_since is not None and days_since <= 4:
         return "休息日", "rest"
     if days_since == 1:
@@ -333,7 +339,7 @@ def _connection_state(category_key: str, days_since: int | None, weekday: int) -
         return "少し離れている", "connected"
     if days_since is not None:
         return "再接続できる", "reconnect"
-    return "今週は静か", "quiet"
+    return "—", "quiet"
 
 
 def _minutes_between(start, end) -> int:
@@ -678,6 +684,12 @@ def get_focus_home(db: Session = Depends(get_db)):
         or db.query(InsightSeed).filter(InsightSeed.is_active.is_(True)).order_by(InsightSeed.id.asc()).first()
     )
     principle_icon = "💎" if principle and "ダイヤモンド" in principle.title else "🧘"
+    creation_resume_note = (
+        db.query(ResumeNote)
+        .filter(ResumeNote.category_key == "creation", ResumeNote.is_active.is_(True))
+        .order_by(ResumeNote.updated_at.desc(), ResumeNote.id.desc())
+        .first()
+    )
 
     return FocusHomeOut(
         action=action,
@@ -689,6 +701,7 @@ def get_focus_home(db: Session = Depends(get_db)):
             title=principle.title,
             text=principle.insight,
         ),
+        creation_resume_note=creation_resume_note.note if creation_resume_note else None,
     )
 
 
@@ -714,6 +727,22 @@ def update_focus_habit(habit_key: str, payload: HabitCheckPayload, db: Session =
         standard_minutes=definition["standard"], minimum_minutes=definition["minimum"],
         cue=definition["cue"], completed_minutes=payload.minutes,
     )
+
+
+@router.put("/focus/resume-note/creation")
+def update_creation_resume_note(payload: ResumeNotePayload, db: Session = Depends(get_db)):
+    note = payload.note.strip()
+    if not note:
+        raise HTTPException(status_code=422, detail="Resume note is empty")
+    db.query(ResumeNote).filter(
+        ResumeNote.category_key == "creation",
+        ResumeNote.is_active.is_(True),
+    ).update({ResumeNote.is_active: False}, synchronize_session=False)
+    row = ResumeNote(category_key="creation", note=note, is_active=True)
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return {"note": row.note}
 
 
 @router.get("/focus/insights", response_model=list[FocusPrinciple])

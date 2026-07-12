@@ -4,6 +4,7 @@ import {
   fetchFocusHome,
   FocusHabit,
   FocusHome,
+  updateCreationResumeNote,
   updateFocusHabit,
 } from "../api/client";
 import { plantSeed } from "../api/dreams";
@@ -59,12 +60,20 @@ function fieldLabel(score: number) {
   return "これから育つ";
 }
 
+function displayHabitStatus(habit: FocusHabit) {
+  if (habit.key === "creation" && (habit.status === "minimum" || habit.status === "done")) return "done";
+  return habit.status;
+}
+
 export default function Dashboard() {
   const [home, setHome] = useState<FocusHome | null>(null);
   const [selectedHabit, setSelectedHabit] = useState<FocusHabit | null>(null);
   const [actionOpen, setActionOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(false);
+  const [pendingCreation, setPendingCreation] = useState<{ label: string; minutes: number } | null>(null);
+  const [showResumePrompt, setShowResumePrompt] = useState(false);
+  const [resumeDraft, setResumeDraft] = useState("");
 
   const load = async () => {
     const data = await fetchFocusHome();
@@ -97,6 +106,40 @@ export default function Dashboard() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const completeCreation = async () => {
+    if (!pendingCreation) return;
+    setSaving(true);
+    try {
+      await updateFocusHabit("creation", pendingCreation.minutes);
+      await load();
+      setPendingCreation(null);
+      setShowResumePrompt(true);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const saveResumeNote = async () => {
+    if (!resumeDraft.trim()) return;
+    setSaving(true);
+    try {
+      await updateCreationResumeNote(resumeDraft.trim());
+      await load();
+      setResumeDraft("");
+      setShowResumePrompt(false);
+      setSelectedHabit(null);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const closeCreationFlow = () => {
+    setPendingCreation(null);
+    setShowResumePrompt(false);
+    setResumeDraft("");
+    setSelectedHabit(null);
   };
 
   if (error) {
@@ -166,28 +209,74 @@ export default function Dashboard() {
         </header>
         <div className="habit-line">
           {home.habits.map((habit) => (
+            (() => {
+              const displayStatus = displayHabitStatus(habit);
+              return (
             <button
               type="button"
-              className={`habit-item ${habit.status} ${selectedHabit?.key === habit.key ? "selected" : ""}`}
+              className={`habit-item ${displayStatus} ${selectedHabit?.key === habit.key ? "selected" : ""}`}
               key={habit.key}
-              onClick={() => setSelectedHabit(selectedHabit?.key === habit.key ? null : habit)}
+              onClick={() => {
+                const closing = selectedHabit?.key === habit.key;
+                setSelectedHabit(closing ? null : habit);
+                setPendingCreation(null);
+                setShowResumePrompt(false);
+                setResumeDraft("");
+              }}
             >
               <span>{habit.icon}</span>
-              <strong>{HABIT_COPY[habit.key]?.label ?? habit.label}</strong>
-              <em><b>{STATUS_MARK[habit.status] ?? "○"}</b>{STATUS_LABEL[habit.status]}</em>
+              <span className="habit-copy">
+                <strong>{HABIT_COPY[habit.key]?.label ?? habit.label}</strong>
+                {habit.key === "creation" && <small>原稿を5分だけ開く</small>}
+              </span>
+              <em><b>{STATUS_MARK[displayStatus] ?? "○"}</b>{STATUS_LABEL[displayStatus]}</em>
             </button>
+              );
+            })()
           ))}
         </div>
         {selectedHabit && (
           <div className="habit-detail">
-            <div>
+            <div className="habit-detail-copy">
               <strong>{selectedHabit.icon} {selectedCopy?.label ?? selectedHabit.label}</strong>
               <span>少し触れるだけでも、明日の再開が軽くなります。</span>
+              {selectedHabit.key === "creation" && home.creation_resume_note && !showResumePrompt && (
+                <blockquote>
+                  <small>前回の続き</small>
+                  {home.creation_resume_note}
+                </blockquote>
+              )}
             </div>
-            {selectedHabit.status !== "off" && (
+            {selectedHabit.key === "creation" && showResumePrompt ? (
+              <div className="resume-note-form">
+                <label htmlFor="creation-resume-note">次はどこから始める？</label>
+                <input
+                  id="creation-resume-note"
+                  value={resumeDraft}
+                  onChange={(event) => setResumeDraft(event.target.value)}
+                  placeholder="例：エレノアが雷を放つ直前から書く"
+                  maxLength={500}
+                  autoFocus
+                />
+                <div>
+                  <button type="button" onClick={closeCreationFlow}>スキップ</button>
+                  <button type="button" className="primary" onClick={saveResumeNote} disabled={saving || !resumeDraft.trim()}>保存する</button>
+                </div>
+              </div>
+            ) : selectedHabit.key === "creation" && pendingCreation ? (
+              <div className="creation-complete">
+                <span>{pendingCreation.label}</span>
+                <button type="button" className="primary" onClick={completeCreation} disabled={saving}>完了する</button>
+              </div>
+            ) : (selectedHabit.key === "creation" || selectedHabit.status !== "off") && (
               <div className="connection-choices">
                 {(selectedCopy?.choices ?? []).map((choice) => (
-                  <button type="button" key={choice.label} onClick={() => recordHabit(selectedHabit, choice.minutes)} disabled={saving}>
+                  <button
+                    type="button"
+                    key={choice.label}
+                    onClick={() => selectedHabit.key === "creation" ? setPendingCreation(choice) : recordHabit(selectedHabit, choice.minutes)}
+                    disabled={saving}
+                  >
                     {choice.label}
                   </button>
                 ))}

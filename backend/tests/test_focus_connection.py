@@ -1,9 +1,12 @@
 import unittest
 
-from app.routers.dashboard import _connection_state
+from app.routers.dashboard import FOCUS_HABITS, _connection_state
 
 
 class ConnectionStateTest(unittest.TestCase):
+    def test_creation_minimum_connection_is_five_minutes(self):
+        self.assertEqual(FOCUS_HABITS["creation"]["minimum"], 5)
+
     def test_touch_today_is_connected(self):
         self.assertEqual(_connection_state("creation", 0, 0), ("今日も接続中", "hot"))
 
@@ -17,7 +20,7 @@ class ConnectionStateTest(unittest.TestCase):
         self.assertEqual(_connection_state("creation", 4, 0), ("再接続できる", "reconnect"))
 
     def test_empty_social_field_is_quiet(self):
-        self.assertEqual(_connection_state("life", None, 0), ("今週は静か", "quiet"))
+        self.assertEqual(_connection_state("life", None, 0), ("—", "quiet"))
 
     def test_body_between_routine_days_is_resting(self):
         self.assertEqual(_connection_state("body", 2, 3), ("休息日", "rest"))

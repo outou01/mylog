@@ -380,6 +380,7 @@ export interface FocusHome {
   habits: FocusHabit[];
   fields: FocusField[];
   principle: { id: number; icon: string; title: string; text: string };
+  creation_resume_note: string | null;
 }
 
 export const fetchFocusHome = () =>
@@ -387,6 +388,9 @@ export const fetchFocusHome = () =>
 
 export const updateFocusHabit = (key: string, minutes: number) =>
   api.put<FocusHabit>(`/dashboard/focus/habits/${key}`, { minutes }).then((r) => r.data);
+
+export const updateCreationResumeNote = (note: string) =>
+  api.put<{ note: string }>("/dashboard/focus/resume-note/creation", { note }).then((r) => r.data);
 
 export const updateDashboardPurpose = (text: string) =>
   api.patch<{ text: string }>("/dashboard/purpose", { text }).then((r) => r.data);

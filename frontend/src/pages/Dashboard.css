@@ -193,6 +193,8 @@
 
 .habit-item > span { font-size: 1.1rem; }
 .habit-item strong { font-size: 0.86rem; }
+.habit-copy { display: grid; gap: 0.15rem; }
+.habit-copy small { color: #77877b; font-size: 0.64rem; font-weight: 600; }
 .habit-item em {
   display: inline-flex;
   align-items: center;
@@ -223,6 +225,34 @@
 .habit-detail strong { color: #f0eadf; font-size: 0.86rem; }
 .habit-detail span { color: #91a08e; font-size: 0.72rem; margin-top: 0.2rem; }
 .habit-detail > div:last-child { display: flex; gap: 0.4rem; }
+.habit-detail-copy blockquote {
+  border-left: 2px solid rgba(169, 112, 214, 0.65);
+  color: #d8c9df;
+  font-size: 0.78rem;
+  line-height: 1.55;
+  margin: 0.65rem 0 0;
+  padding-left: 0.65rem;
+}
+.habit-detail-copy blockquote small { color: #9f8daa; display: block; margin-bottom: 0.15rem; }
+.creation-complete { align-items: center; }
+.creation-complete > span { color: #d8c9df; margin: 0; }
+.creation-complete .primary,
+.resume-note-form .primary { border-color: #d8b05f; background: #d8b05f; color: #18140d; }
+.resume-note-form {
+  display: grid !important;
+  gap: 0.4rem !important;
+  min-width: min(420px, 48vw);
+}
+.resume-note-form label { color: #ece4d8; font-size: 0.78rem; font-weight: 800; }
+.resume-note-form input {
+  min-height: 40px;
+  border: 1px solid rgba(169, 112, 214, 0.45);
+  border-radius: 5px;
+  background: #0d1514;
+  color: #e9e4dc;
+  padding: 0.55rem 0.65rem;
+}
+.resume-note-form > div { display: flex; justify-content: flex-end; gap: 0.4rem; }
 .connection-choices button:first-child { border-color: rgba(143, 198, 152, 0.35); }
 .connection-choices button:last-child { border-color: rgba(216, 176, 95, 0.5); }
 
@@ -307,6 +337,7 @@
   .habit-line { grid-template-columns: 1fr; }
   .habit-detail { align-items: stretch; flex-direction: column; }
   .habit-detail > div:last-child button { flex: 1; }
+  .resume-note-form { min-width: 0; }
   .home-field-row { grid-template-columns: 96px 1fr 32px; gap: 0.5rem; }
   .home-field-row > small { display: none; }
   .connection-state { grid-column: 2 / -1; }
