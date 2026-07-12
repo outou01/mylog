@@ -263,7 +263,10 @@
 .connection-state.connected::before { background: #76b982; }
 .connection-state.reconnect { color: #d5a985; }
 .connection-state.reconnect::before { background: #d98261; }
-.connection-state.new::before { background: #7b8f84; }
+.connection-state.rest,
+.connection-state.quiet { color: #7f8c82; }
+.connection-state.rest::before,
+.connection-state.quiet::before { background: #657269; }
 
 .daily-principle {
   display: grid;

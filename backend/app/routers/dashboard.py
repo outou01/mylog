@@ -282,7 +282,7 @@ def _seed_focus_defaults(db: Session) -> None:
     db.commit()
 
 
-def _focus_habits(db: Session, today: date) -> list[FocusHabit]:
+def _focus_habits(db: Session, today: date, connection_events: list[dict]) -> list[FocusHabit]:
     checks = {
         row.habit_key: row
         for row in db.query(HabitCheck).filter(HabitCheck.check_date == today).all()
@@ -290,10 +290,16 @@ def _focus_habits(db: Session, today: date) -> list[FocusHabit]:
     result = []
     for key, definition in FOCUS_HABITS.items():
         check = checks.get(key)
+        field_minutes = sum(
+            event["duration_minutes"] or 0
+            for event in connection_events
+            if event["performed_on"] == today and event["category_key"] == definition["field"]
+        )
+        completed_minutes = max(check.minutes if check else 0, field_minutes)
         due = _habit_is_due(key, today.weekday())
-        if check and check.minutes >= definition["standard"]:
+        if completed_minutes >= definition["standard"]:
             status = "done"
-        elif check and check.minutes > 0:
+        elif completed_minutes >= definition["minimum"]:
             status = "minimum"
         elif due:
             status = "today"
@@ -307,21 +313,27 @@ def _focus_habits(db: Session, today: date) -> list[FocusHabit]:
             standard_minutes=definition["standard"],
             minimum_minutes=definition["minimum"],
             cue=definition["cue"],
-            completed_minutes=check.minutes if check else 0,
+            completed_minutes=completed_minutes,
         ))
     return result
 
 
-def _connection_state(days_since: int | None) -> tuple[str, str]:
+def _connection_state(category_key: str, days_since: int | None, weekday: int) -> tuple[str, str]:
     if days_since == 0:
-        return "今日触れた", "hot"
+        return "今日も接続中", "hot"
+    if category_key == "body" and weekday in {1, 6}:
+        return "再接続できる", "reconnect"
+    if category_key == "life" and days_since is None:
+        return "今週は静か", "quiet"
+    if category_key == "body" and weekday not in {1, 6} and days_since is not None and days_since <= 4:
+        return "休息日", "rest"
     if days_since == 1:
         return "まだ温かい", "warm"
     if days_since is not None and days_since <= 3:
-        return "接続中", "connected"
+        return "少し離れている", "connected"
     if days_since is not None:
-        return "再接続しよう", "reconnect"
-    return "今日つなごう", "new"
+        return "再接続できる", "reconnect"
+    return "今週は静か", "quiet"
 
 
 def _minutes_between(start, end) -> int:
@@ -539,15 +551,20 @@ JSONのみ（顔文字はfaceにだけ入れ、messageには入れない）:
 def get_focus_home(db: Session = Depends(get_db)):
     today = date.today()
     hour = datetime.now().hour
-    habits = _focus_habits(db, today)
 
-    from app.routers.soil import CATEGORIES as SOIL_CATEGORIES, _compute_field_scores
-    scores, by_category = _compute_field_scores(db)
+    from app.routers.soil import CATEGORIES as SOIL_CATEGORIES, _compute_field_scores, _connection_events
+    scores, _ = _compute_field_scores(db)
+    connection_events = _connection_events(db, today - timedelta(days=30), today)
+    habits = _focus_habits(db, today, connection_events)
+    connection_by_category = {
+        item["key"]: [event for event in connection_events if event["category_key"] == item["key"]]
+        for item in SOIL_CATEGORIES
+    }
     fields = []
     for item in SOIL_CATEGORIES:
-        recent = by_category[item["key"]]
+        recent = connection_by_category[item["key"]]
         days_since = (today - recent[0]["performed_on"]).days if recent else None
-        connection_label, connection_tone = _connection_state(days_since)
+        connection_label, connection_tone = _connection_state(item["key"], days_since, today.weekday())
         fields.append(FocusField(
             key=item["key"],
             name=item["name"],
@@ -571,10 +588,6 @@ def get_focus_home(db: Session = Depends(get_db)):
             ScheduleBlock.seed_task_id.is_not(None),
         ).all()
     }
-    today_categories = {
-        row[0] for row in db.query(ScheduleBlock.category).filter(ScheduleBlock.date == today).all()
-    }
-
     due_undone = [
         habit for habit in habits if habit.status == "today"
     ]
@@ -593,11 +606,21 @@ def get_focus_home(db: Session = Depends(get_db)):
             standard_minutes=definition["standard"], minimum_minutes=definition["minimum"],
             minimum_label=definition["minimum_label"],
         )
-    elif today.weekday() == 6 and hour < 12 and "workout" not in today_categories:
+    elif today.weekday() == 6 and hour < 12 and not any(
+        event["category_key"] == "body" and event["performed_on"] == today for event in connection_events
+    ):
         action = FocusAction(
             kind="calendar", key="workout", icon="💪", title="朝のジム",
             reason="身体を整えたら、その後の今日は自由です。",
             standard_minutes=60, minimum_minutes=10, minimum_label="10分だけ身体を動かす",
+        )
+    elif today.weekday() == 1 and not any(
+        event["category_key"] == "body" and event["performed_on"] == today for event in connection_events
+    ):
+        action = FocusAction(
+            kind="calendar", key="workout", icon="⭕", title="リングフィットを30分",
+            reason="最低ラインは10分。身体との接続を軽く保つ日です。",
+            standard_minutes=30, minimum_minutes=10, minimum_label="10分だけ身体を動かす",
         )
     elif hour >= 22 and due_undone:
         habit = due_undone[0]

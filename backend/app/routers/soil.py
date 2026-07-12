@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.ai_client import chat, parse_json
 from app.database import get_db
-from app.models import DailyLog, ScheduleBlock
+from app.models import DailyLog, HabitCheck, ScheduleBlock
 from app.schemas import DailyLogOut
 
 router = APIRouter(prefix="/soil", tags=["soil"])
@@ -505,6 +505,24 @@ def _manual_event(log: SoilActionLog, defs: dict[int, SoilActionDefinition]) -> 
     }
 
 
+def _habit_event(check: HabitCheck) -> dict | None:
+    category = {"meditation": "mind", "reading": "knowledge", "creation": "creation"}.get(check.habit_key)
+    if not category or check.minutes <= 0:
+        return None
+    defaults = {"meditation": 5, "reading": 15, "creation": 30}
+    names = {"meditation": "心を整える", "reading": "知識に触れる", "creation": "創作に触れる"}
+    return {
+        "id": -(1_000_000 + check.id),
+        "action_name": names[check.habit_key],
+        "category_key": category,
+        "performed_on": check.check_date,
+        "duration_minutes": check.minutes,
+        "source_type": "habit",
+        "base_score": SCHEDULE_BASE_SCORE[category],
+        "default_minutes": defaults[check.habit_key],
+    }
+
+
 def _event_out(event: dict) -> SoilLogOut:
     return SoilLogOut(
         id=event["id"],
@@ -522,15 +540,41 @@ def _soil_events(db: Session, start: date | None = None, end: date | None = None
     defs = {d.id: d for d in db.query(SoilActionDefinition).all()}
     manual_query = db.query(SoilActionLog)
     calendar_query = db.query(ScheduleBlock).filter(ScheduleBlock.category != "work")
+    habit_query = db.query(HabitCheck).filter(HabitCheck.minutes > 0)
     if start:
         manual_query = manual_query.filter(SoilActionLog.performed_on >= start)
         calendar_query = calendar_query.filter(ScheduleBlock.date >= start)
+        habit_query = habit_query.filter(HabitCheck.check_date >= start)
     if end:
         manual_query = manual_query.filter(SoilActionLog.performed_on <= end)
         calendar_query = calendar_query.filter(ScheduleBlock.date <= end)
+        habit_query = habit_query.filter(HabitCheck.check_date <= end)
 
     events = [_manual_event(log, defs) for log in manual_query.all() if log.category_key in CATEGORY_KEYS]
     for block in calendar_query.all():
+        event = _schedule_event(block)
+        if event:
+            events.append(event)
+    for check in habit_query.all():
+        event = _habit_event(check)
+        if event:
+            events.append(event)
+    return sorted(events, key=lambda item: (item["performed_on"], abs(item["id"])), reverse=True)
+
+
+def _connection_events(db: Session, start: date, end: date) -> list[dict]:
+    """Actual touches only: manual logs, habit checks, and completed calendar blocks."""
+    events = [
+        event for event in _soil_events(db, start=start, end=end)
+        if event["source_type"] != "calendar"
+    ]
+    completed = db.query(ScheduleBlock).filter(
+        ScheduleBlock.date >= start,
+        ScheduleBlock.date <= end,
+        ScheduleBlock.category != "work",
+        ScheduleBlock.completed.is_(True),
+    ).all()
+    for block in completed:
         event = _schedule_event(block)
         if event:
             events.append(event)
