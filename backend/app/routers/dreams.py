@@ -64,6 +64,8 @@ class SeedPayload(BaseModel):
 class SeedOut(SeedPayload):
     id: int
     completed_at: str | None = None
+    last_connected_at: str | None = None
+    scheduled_for: str | None = None
 
 
 class CompleteSeedPayload(BaseModel):
@@ -114,7 +116,8 @@ def _project_out(project: DreamProject) -> ProjectOut:
     )
 
 
-def _seed_out(seed: SeedTask) -> SeedOut:
+def _seed_out(seed: SeedTask, schedule_meta: dict | None = None) -> SeedOut:
+    schedule_meta = schedule_meta or {}
     return SeedOut(
         id=seed.id,
         parent_id=seed.parent_id,
@@ -136,7 +139,28 @@ def _seed_out(seed: SeedTask) -> SeedOut:
         status=seed.status,
         notes=seed.notes,
         completed_at=seed.completed_at.isoformat() if seed.completed_at else None,
+        last_connected_at=schedule_meta.get("last_connected_at"),
+        scheduled_for=schedule_meta.get("scheduled_for"),
     )
+
+
+def _seed_schedule_meta(db: Session, seed_ids: list[int]) -> dict[int, dict[str, str | None]]:
+    if not seed_ids:
+        return {}
+    today = dt_date.today()
+    blocks = db.query(ScheduleBlock).filter(ScheduleBlock.seed_task_id.in_(seed_ids)).all()
+    result = {seed_id: {"last_connected_at": None, "scheduled_for": None} for seed_id in seed_ids}
+    for block in blocks:
+        item = result[block.seed_task_id]
+        if block.completed:
+            value = datetime.combine(block.date, block.end_time).isoformat()
+            if not item["last_connected_at"] or value > item["last_connected_at"]:
+                item["last_connected_at"] = value
+        elif block.date >= today:
+            value = datetime.combine(block.date, block.start_time).isoformat()
+            if not item["scheduled_for"] or value < item["scheduled_for"]:
+                item["scheduled_for"] = value
+    return result
 
 
 def _normalize_category(category: str) -> str:
@@ -335,7 +359,11 @@ def get_project_detail(dream_id: int, db: Session = Depends(get_db)):
         .order_by(SeedTask.sort_order.asc(), SeedTask.section.asc(), SeedTask.id.asc())
         .all()
     )
-    return ProjectDetailOut(dream=_dream_out(dream), project=_project_out(project), seeds=[_seed_out(seed) for seed in seeds])
+    meta = _seed_schedule_meta(db, [seed.id for seed in seeds])
+    return ProjectDetailOut(
+        dream=_dream_out(dream), project=_project_out(project),
+        seeds=[_seed_out(seed, meta.get(seed.id)) for seed in seeds],
+    )
 
 
 @router.patch("/projects/{project_id}", response_model=ProjectOut)
@@ -357,7 +385,8 @@ def update_project(project_id: int, payload: ProjectPayload, db: Session = Depen
 def list_seeds(db: Session = Depends(get_db)):
     _seed_defaults(db)
     seeds = db.query(SeedTask).order_by(SeedTask.sort_order.asc(), SeedTask.category.asc(), SeedTask.section.asc(), SeedTask.id.asc()).all()
-    return [_seed_out(seed) for seed in seeds]
+    meta = _seed_schedule_meta(db, [seed.id for seed in seeds])
+    return [_seed_out(seed, meta.get(seed.id)) for seed in seeds]
 
 
 @router.post("/seeds", response_model=SeedOut, status_code=201)

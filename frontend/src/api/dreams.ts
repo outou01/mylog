@@ -55,6 +55,8 @@ export interface SeedTask {
   status: string;
   notes: string | null;
   completed_at: string | null;
+  last_connected_at: string | null;
+  scheduled_for: string | null;
 }
 
 export interface SeedPayload {
