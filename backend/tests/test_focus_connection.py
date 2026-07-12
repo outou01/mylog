@@ -1,9 +1,12 @@
 import unittest
 
-from app.routers.dashboard import FOCUS_HABITS, _connection_state
+from app.routers.dashboard import FOCUS_HABITS, _connection_state, _habit_schedule_marker
 
 
 class ConnectionStateTest(unittest.TestCase):
+    def test_home_habit_calendar_marker_is_stable(self):
+        self.assertEqual(_habit_schedule_marker("reading"), "[home-habit:reading]")
+
     def test_creation_minimum_connection_is_five_minutes(self):
         self.assertEqual(FOCUS_HABITS["creation"]["minimum"], 5)
 

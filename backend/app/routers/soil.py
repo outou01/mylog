@@ -476,6 +476,8 @@ def _schedule_soil_category(block: ScheduleBlock) -> str | None:
 
 
 def _schedule_event(block: ScheduleBlock) -> dict | None:
+    if (block.note or "").startswith("[home-habit:"):
+        return None
     category = _schedule_soil_category(block)
     if not category:
         return None

@@ -324,6 +324,56 @@ def _focus_habits(db: Session, today: date, connection_events: list[dict]) -> li
     return result
 
 
+def _habit_schedule_marker(habit_key: str) -> str:
+    return f"[home-habit:{habit_key}]"
+
+
+def _sync_habit_schedule_blocks(db: Session, target_date: date) -> bool:
+    """Mirror home habit checks into completed calendar blocks without duplicating growth logs."""
+    checks = db.query(HabitCheck).filter(
+        HabitCheck.check_date == target_date,
+    ).all()
+    changed = False
+    for check in checks:
+        if check.habit_key not in FOCUS_HABITS:
+            continue
+        marker = _habit_schedule_marker(check.habit_key)
+        block = db.query(ScheduleBlock).filter(
+            ScheduleBlock.date == target_date,
+            ScheduleBlock.note == marker,
+        ).first()
+        if check.minutes <= 0:
+            if block:
+                db.delete(block)
+                changed = True
+            continue
+        end_minutes = max(1, datetime.now().hour * 60 + datetime.now().minute)
+        start_minutes = max(0, end_minutes - check.minutes)
+        start_time = datetime.strptime(f"{start_minutes // 60:02d}:{start_minutes % 60:02d}", "%H:%M").time()
+        end_time = datetime.strptime(f"{end_minutes // 60:02d}:{end_minutes % 60:02d}", "%H:%M").time()
+        definition = FOCUS_HABITS[check.habit_key]
+        if block:
+            if block.start_time != start_time or block.end_time != end_time or not block.completed:
+                block.start_time = start_time
+                block.end_time = end_time
+                block.completed = True
+                changed = True
+        else:
+            db.add(ScheduleBlock(
+                date=target_date,
+                start_time=start_time,
+                end_time=end_time,
+                title=definition["label"],
+                category=check.habit_key,
+                note=marker,
+                completed=True,
+            ))
+            changed = True
+    if changed:
+        db.commit()
+    return changed
+
+
 def _connection_state(category_key: str, days_since: int | None, weekday: int) -> tuple[str, str]:
     if days_since == 0:
         return "今日も接続中", "hot"
@@ -557,6 +607,7 @@ JSONのみ（顔文字はfaceにだけ入れ、messageには入れない）:
 def get_focus_home(db: Session = Depends(get_db)):
     today = date.today()
     hour = datetime.now().hour
+    _sync_habit_schedule_blocks(db, today)
 
     from app.routers.soil import CATEGORIES as SOIL_CATEGORIES, _compute_field_scores, _connection_events
     scores, _ = _compute_field_scores(db)
@@ -720,6 +771,7 @@ def update_focus_habit(habit_key: str, payload: HabitCheckPayload, db: Session =
         row = HabitCheck(habit_key=habit_key, check_date=today, minutes=payload.minutes)
         db.add(row)
     db.commit()
+    _sync_habit_schedule_blocks(db, today)
     definition = FOCUS_HABITS[habit_key]
     status = "done" if payload.minutes >= definition["standard"] else "minimum" if payload.minutes > 0 else "today"
     return FocusHabit(
