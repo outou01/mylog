@@ -9,20 +9,12 @@ import {
   updateScheduleBlock,
 } from "../api/calendar";
 import TimeAnalysis from "./TimeAnalysis";
+import { SCHEDULE_CATEGORIES } from "../constants/categories";
 import "./Calendar.css";
 
 const WEEKDAYS = ["月", "火", "水", "木", "金", "土", "日"];
 
 type Tab = "schedule" | "hours";
-
-const SCHEDULE_CATEGORIES = [
-  { key: "creation", label: "創作", shortLabel: "創作" },
-  { key: "workout", label: "筋トレ", shortLabel: "筋トレ" },
-  { key: "job_search", label: "転職活動", shortLabel: "転職" },
-  { key: "social", label: "交流", shortLabel: "交流" },
-  { key: "reading", label: "読書", shortLabel: "読書" },
-  { key: "meditation", label: "瞑想", shortLabel: "瞑想" },
-];
 
 const emptyForm: ScheduleBlockPayload = {
   date: "",

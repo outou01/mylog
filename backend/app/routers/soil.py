@@ -296,15 +296,10 @@ JSONのみ:
 # 5つの畑システム — 状態ではなく行動を記録する
 # ════════════════════════════════════════════════════════════════
 
+from app.category_catalog import FIELD_CATEGORIES, SCHEDULE_TO_FIELD
 from app.models import SoilActionDefinition, SoilActionLog
 
-CATEGORIES = [
-    {"key": "body", "name": "身体", "icon": "💪", "color": "#f9734a"},
-    {"key": "knowledge", "name": "知識", "icon": "📚", "color": "#5d9cec"},
-    {"key": "creation", "name": "創作", "icon": "🎨", "color": "#a970d6"},
-    {"key": "mind", "name": "心", "icon": "🧘", "color": "#9fc9d8"},
-    {"key": "life", "name": "交流", "icon": "🤝", "color": "#58b77b"},
-]
+CATEGORIES = FIELD_CATEGORIES
 CATEGORY_KEYS = {c["key"] for c in CATEGORIES}
 CATEGORY_NAME = {c["key"]: c["name"] for c in CATEGORIES}
 
@@ -320,12 +315,7 @@ SUGGESTIONS = {
 }
 
 SCHEDULE_CATEGORY_TO_SOIL = {
-    "workout": "body",
-    "creation": "creation",
-    "job_search": "knowledge",
-    "reading": "knowledge",
-    "meditation": "mind",
-    "social": "life",
+    **SCHEDULE_TO_FIELD,
     "life": "life",
     "rest": "mind",
 }

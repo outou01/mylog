@@ -1,14 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { fetchProjectDetail, plantSeed, ProjectDetail } from "../api/dreams";
+import { scheduleCategoryLabel } from "../constants/categories";
 import "./Dreams.css";
-
-const CATEGORY_LABEL: Record<string, string> = {
-  creation: "創作",
-  social: "交流",
-  job_search: "転職活動",
-  workout: "筋トレ",
-};
 
 export default function DreamDetail() {
   const { id } = useParams<{ id: string }>();
@@ -38,7 +32,7 @@ export default function DreamDetail() {
       <section className={`project-hero ${detail.dream.category}`}>
         <div className="project-icon">{detail.dream.icon || "🌱"}</div>
         <div>
-          <p>{CATEGORY_LABEL[detail.dream.category] ?? detail.dream.category}</p>
+          <p>{scheduleCategoryLabel(detail.dream.category)}</p>
           <h1>{detail.dream.title}</h1>
           <span>{detail.dream.description}</span>
         </div>

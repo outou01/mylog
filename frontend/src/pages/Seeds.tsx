@@ -8,17 +8,11 @@ import {
   SeedTask,
   updateSeed,
 } from "../api/dreams";
+import { scheduleCategoryLabel } from "../constants/categories";
 import "./Dreams.css";
 
 const UNCATEGORIZED = "-";
 const DEFAULT_CATEGORIES = ["creation", "job_search", "social"];
-
-const CATEGORY_LABEL: Record<string, string> = {
-  creation: "創作",
-  job_search: "転職活動",
-  social: "交流",
-  workout: "筋トレ",
-};
 
 const DEFAULT_SECTIONS: Record<string, string[]> = {
   creation: ["シナリオ", "インプット", "検証"],
@@ -41,7 +35,7 @@ type DragState =
   | null;
 
 function labelCategory(category: string) {
-  return CATEGORY_LABEL[category] ?? category;
+  return scheduleCategoryLabel(category);
 }
 
 function normalizeSection(section: string | null | undefined) {

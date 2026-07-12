@@ -6,19 +6,12 @@ import {
   TimeAnalysisSection,
   TimeCategoryTotal,
 } from "../api/calendar";
+import { FIELD_CATEGORIES, scheduleKeysForField } from "../constants/categories";
 import "./TimeAnalysis.css";
 
 const WEEKLY_SCALE_MINUTES = 8 * 60;
 const MONTHLY_SCALE_MINUTES = 30 * 60;
 const CUMULATIVE_SCALE_MINUTES = 100 * 60;
-
-const FIELD_DEFINITIONS = [
-  { key: "body", name: "身体", icon: "💪", color: "#f9734a", categories: ["workout"] },
-  { key: "knowledge", name: "知識", icon: "📚", color: "#5d9cec", categories: ["reading", "job_search"] },
-  { key: "creation", name: "創作", icon: "🎨", color: "#a970d6", categories: ["creation"] },
-  { key: "mind", name: "心", icon: "🧘", color: "#9fc9d8", categories: ["meditation"] },
-  { key: "social", name: "交流", icon: "🤝", color: "#58b77b", categories: ["social"] },
-] as const;
 
 type FieldGrowth = {
   key: string;
@@ -52,9 +45,10 @@ function plantStage(percent: number) {
 }
 
 function toFields(categories: TimeCategoryTotal[], scaleMinutes: number): FieldGrowth[] {
-  return FIELD_DEFINITIONS.map((field) => {
+  return FIELD_CATEGORIES.map((field) => {
+    const categoryKeys = scheduleKeysForField(field.key);
     const minutes = categories
-      .filter((category) => (field.categories as readonly string[]).includes(category.key))
+      .filter((category) => categoryKeys.includes(category.key))
       .reduce((total, category) => total + category.minutes, 0);
     const percent = Math.min(100, Math.round((minutes / scaleMinutes) * 100));
     return {

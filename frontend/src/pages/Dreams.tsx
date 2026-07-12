@@ -1,14 +1,8 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { createDream, deleteDream, Dream, DreamPayload, fetchDreams, updateDream } from "../api/dreams";
+import { scheduleCategoryLabel } from "../constants/categories";
 import "./Dreams.css";
-
-const CATEGORY_LABEL: Record<string, string> = {
-  creation: "創作",
-  social: "交流",
-  job_search: "転職活動",
-  workout: "筋トレ",
-};
 
 const emptyDream: DreamPayload = {
   title: "",
@@ -84,7 +78,7 @@ export default function Dreams() {
                 {dream.image_url ? <img src={dream.image_url} alt="" /> : <span>{dream.icon || "🌱"}</span>}
               </div>
               <div className="dream-card-body">
-                <span className="dream-category">{CATEGORY_LABEL[dream.category] ?? dream.category}</span>
+                <span className="dream-category">{scheduleCategoryLabel(dream.category)}</span>
                 <h2>{dream.title}</h2>
                 <p>{dream.description || "この夢の説明を追加できます。"}</p>
               </div>
@@ -110,10 +104,9 @@ export default function Dreams() {
         <label>
           カテゴリ
           <select value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })}>
-            <option value="creation">創作</option>
-            <option value="social">交流</option>
-            <option value="job_search">転職活動</option>
-            <option value="workout">筋トレ</option>
+            {(["creation", "social", "job_search", "workout"] as const).map((category) => (
+              <option value={category} key={category}>{scheduleCategoryLabel(category)}</option>
+            ))}
           </select>
         </label>
         <label>

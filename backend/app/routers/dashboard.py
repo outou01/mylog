@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.ai_client import chat, parse_json
+from app.category_catalog import SCHEDULE_CATEGORIES, SCHEDULE_LABELS
 from app.database import get_db
 from app.models import (
     ActiveProject,
@@ -39,11 +40,8 @@ FIELD_LEVELS = [
 ARIA_TIMEOUT_SECONDS = 6.0
 
 # 実績時間の正: 完了済みScheduleBlockのカテゴリ
-SELF_CATEGORIES = {"creation", "workout", "job_search", "social", "reading", "meditation"}
-CATEGORY_LABEL = {
-    "creation": "創作", "workout": "筋トレ", "job_search": "転職活動", "social": "交流",
-    "reading": "読書", "meditation": "瞑想",
-}
+SELF_CATEGORIES = {category["key"] for category in SCHEDULE_CATEGORIES}
+CATEGORY_LABEL = SCHEDULE_LABELS
 WORKDAY_MINUTES = 540  # 平日 9:30-18:30
 
 # Ariaコメントのキャッシュ（Gemini無料枠の保護）
@@ -545,15 +543,14 @@ def get_focus_home(db: Session = Depends(get_db)):
 
     from app.routers.soil import CATEGORIES as SOIL_CATEGORIES, _compute_field_scores
     scores, by_category = _compute_field_scores(db)
-    field_order = {"body": 0, "mind": 1, "knowledge": 2, "creation": 3, "life": 4}
     fields = []
-    for item in sorted(SOIL_CATEGORIES, key=lambda category: field_order.get(category["key"], 99)):
+    for item in SOIL_CATEGORIES:
         recent = by_category[item["key"]]
         days_since = (today - recent[0]["performed_on"]).days if recent else None
         connection_label, connection_tone = _connection_state(days_since)
         fields.append(FocusField(
             key=item["key"],
-            name="発信・交流" if item["key"] == "life" else item["name"],
+            name=item["name"],
             icon=item["icon"], color=item["color"], score=scores[item["key"]],
             connection_label=connection_label, connection_tone=connection_tone,
             days_since_touch=days_since,
