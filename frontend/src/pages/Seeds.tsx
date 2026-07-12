@@ -4,6 +4,7 @@ import {
   createSeed,
   deleteSeed,
   fetchSeeds,
+  plantSeed,
   SeedPayload,
   SeedTask,
   updateSeed,
@@ -224,6 +225,12 @@ export default function Seeds() {
     setOpenTodoMenu(null);
   };
 
+  const plantToday = async (seed: SeedTask) => {
+    await plantSeed(seed.id);
+    setOpenTodoMenu(null);
+    await load();
+  };
+
   const remove = async (seed: SeedTask) => {
     if (!window.confirm(`「${seed.title}」を削除しますか？`)) return;
     await deleteSeed(seed.id);
@@ -302,6 +309,7 @@ export default function Seeds() {
           <button type="button" aria-label="Todoの操作" title="操作" onClick={() => setOpenTodoMenu(openTodoMenu === seed.id ? null : seed.id)}>⋮</button>
           {openTodoMenu === seed.id && (
             <div className="seed-popover-menu">
+              <button type="button" onClick={() => plantToday(seed)}>今日の予定に入れる</button>
               <button type="button" onClick={() => { setAddingTo(`child:${seed.id}`); setNewTitle(""); }}>子Todoを追加</button>
               <button type="button" onClick={() => duplicate(seed)}>複製</button>
               <button type="button" onClick={() => setSelectedId(seed.id)}>移動・編集</button>
@@ -409,7 +417,13 @@ export default function Seeds() {
               <span>予定<strong>{scheduleLabel(selectedSeed.scheduled_for)}</strong></span>
             </div>
             <label>備考・悩み<textarea rows={9} value={selectedDraft.notes ?? ""} onChange={(event) => updateDraft(selectedSeed.id, { notes: event.target.value })} placeholder="なぜやるか、悩み、モチベーション源、手順など" /></label>
-            <footer><span>{savingId === selectedSeed.id ? "保存中…" : ""}</span><button type="button" onClick={() => save(selectedSeed)}>変更を保存</button></footer>
+            <footer>
+              <span>{savingId === selectedSeed.id ? "保存中…" : ""}</span>
+              <div>
+                <button type="button" className="secondary" onClick={() => plantToday(selectedSeed)}>今日の予定に入れる</button>
+                <button type="button" onClick={() => save(selectedSeed)}>変更を保存</button>
+              </div>
+            </footer>
           </aside>
         </>
       )}

@@ -1396,7 +1396,9 @@
 .seed-detail-meta strong { display: block; color: #cbd3ce; font-size: 0.75rem; margin-top: 0.2rem; }
 .seed-detail-drawer footer { position: sticky; bottom: -1.2rem; display: flex; align-items: center; justify-content: space-between; background: #0d151b; border-top: 1px solid rgba(226, 232, 226, 0.1); padding: 0.9rem 0 1.2rem; }
 .seed-detail-drawer footer span { color: #7f8b84; font-size: 0.68rem; }
+.seed-detail-drawer footer > div { display: flex; gap: 0.45rem; }
 .seed-detail-drawer footer button { min-height: 38px; border: 1px solid #d8b05f; border-radius: 5px; background: #d8b05f; color: #17130c; font-weight: 900; padding: 0.45rem 0.85rem; }
+.seed-detail-drawer footer button.secondary { border-color: #34443d; background: #16221e; color: #c9d2cc; }
 
 @media (max-width: 760px) {
   .seed-db-toolbar { align-items: stretch; flex-direction: column; }

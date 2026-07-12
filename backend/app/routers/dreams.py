@@ -440,19 +440,32 @@ def plant_seed(seed_id: int, payload: PlantPayload | None = None, db: Session = 
     block_date = payload.date or dt_date.today()
     start = _parse_hhmm(payload.start_time) if payload.start_time else _default_start()
     end = _end_time(start, seed.estimated_minutes)
-    block = ScheduleBlock(
-        date=block_date,
-        start_time=start,
-        end_time=end,
-        title=seed.title,
-        category=seed.category,
-        note=seed.notes or seed.purpose or seed.importance or seed.description,
-        dream_id=seed.dream_id,
-        project_id=seed.project_id,
-        seed_task_id=seed.id,
-    )
+    block = db.query(ScheduleBlock).filter(
+        ScheduleBlock.seed_task_id == seed.id,
+        ScheduleBlock.completed.is_(False),
+        ScheduleBlock.date >= dt_date.today(),
+    ).order_by(ScheduleBlock.date.asc(), ScheduleBlock.start_time.asc()).first()
+    if block:
+        block.date = block_date
+        block.start_time = start
+        block.end_time = end
+        block.title = seed.title
+        block.category = seed.category
+        block.note = seed.notes or seed.purpose or seed.importance or seed.description
+    else:
+        block = ScheduleBlock(
+            date=block_date,
+            start_time=start,
+            end_time=end,
+            title=seed.title,
+            category=seed.category,
+            note=seed.notes or seed.purpose or seed.importance or seed.description,
+            dream_id=seed.dream_id,
+            project_id=seed.project_id,
+            seed_task_id=seed.id,
+        )
+        db.add(block)
     seed.status = "planted"
-    db.add(block)
     db.commit()
     db.refresh(block)
     return PlantedOut(
@@ -482,6 +495,12 @@ def complete_seed(seed_id: int, payload: CompleteSeedPayload | None = None, db: 
         .first()
     )
     if existing_block:
+        start = _default_start()
+        existing_block.date = dt_date.today()
+        existing_block.start_time = start
+        existing_block.end_time = _end_time(start, actual_minutes)
+        existing_block.title = seed.title
+        existing_block.category = seed.category
         existing_block.completed = True
     else:
         start = _default_start()
@@ -500,4 +519,5 @@ def complete_seed(seed_id: int, payload: CompleteSeedPayload | None = None, db: 
 
     db.commit()
     db.refresh(seed)
-    return _seed_out(seed)
+    meta = _seed_schedule_meta(db, [seed.id])
+    return _seed_out(seed, meta.get(seed.id))
