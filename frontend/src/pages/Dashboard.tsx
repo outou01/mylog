@@ -161,7 +161,7 @@ export default function Dashboard() {
 
   return (
     <main className="focus-home">
-      <section className="focus-action" style={{ "--action-color": home.action.key === "creation" ? "#a970d6" : "#79b780" } as React.CSSProperties}>
+      <section className={`focus-action ${home.action.title.length > 24 ? "long-title" : ""}`} style={{ "--action-color": home.action.key === "creation" ? "#a970d6" : "#79b780" } as React.CSSProperties}>
         <div className="focus-action-copy">
           <p className="focus-kicker">今日の一手</p>
           <div className="focus-action-title">
@@ -284,6 +284,38 @@ export default function Dashboard() {
             )}
           </div>
         )}
+      </section>
+
+      <section className="home-rhythm" aria-label="自動運転">
+        {home.primary_project && (
+          <div className="home-primary-project">
+            <span>本命プロジェクト</span>
+            <strong>{home.primary_project.title}</strong>
+            <em>{home.primary_project.progress}%</em>
+          </div>
+        )}
+        <div className="home-fixed-schedule">
+          <span>次の固定予定</span>
+          {home.fixed_schedules.map((item) => (
+            <div key={item.key} className={item.status}>
+              <strong>{item.date_label}</strong>
+              <span>{item.title}</span>
+            </div>
+          ))}
+        </div>
+        <details className="home-maintenance">
+          <summary>
+            <span>今週のメンテナンス</span>
+            <strong>{home.maintenance.filter((item) => item.status === "done").length}/{home.maintenance.length}</strong>
+          </summary>
+          <div>
+            {home.maintenance.map((item) => (
+              <p key={item.key} className={item.status}>
+                <span>{item.title}</span><em>{item.status_label}</em>
+              </p>
+            ))}
+          </div>
+        </details>
       </section>
 
       <section className="home-field">

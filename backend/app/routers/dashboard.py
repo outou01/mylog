@@ -167,12 +167,34 @@ class FocusPrinciple(BaseModel):
     text: str
 
 
+class FocusPrimaryProject(BaseModel):
+    title: str
+    progress: int
+
+
+class FocusFixedSchedule(BaseModel):
+    key: str
+    title: str
+    date_label: str
+    status: str
+
+
+class FocusMaintenance(BaseModel):
+    key: str
+    title: str
+    status: str
+    status_label: str
+
+
 class FocusHomeOut(BaseModel):
     action: FocusAction
     habits: list[FocusHabit]
     fields: list[FocusField]
     principle: FocusPrinciple
     creation_resume_note: str | None = None
+    primary_project: FocusPrimaryProject | None = None
+    fixed_schedules: list[FocusFixedSchedule] = []
+    maintenance: list[FocusMaintenance] = []
 
 
 class HabitCheckPayload(BaseModel):
@@ -293,7 +315,7 @@ def _focus_habits(db: Session, today: date, connection_events: list[dict]) -> li
         row.habit_key: row
         for row in db.query(HabitCheck).filter(HabitCheck.check_date == today).all()
     }
-    result = []
+    result: list[tuple[date, FocusFixedSchedule]] = []
     for key, definition in FOCUS_HABITS.items():
         check = checks.get(key)
         field_minutes = sum(
@@ -390,6 +412,66 @@ def _connection_state(category_key: str, days_since: int | None, weekday: int) -
     if days_since is not None:
         return "再接続できる", "reconnect"
     return "—", "quiet"
+
+
+def _next_weekday(today: date, weekday: int) -> date:
+    return today + timedelta(days=(weekday - today.weekday()) % 7)
+
+
+def _fixed_schedule_summary(db: Session, today: date) -> list[FocusFixedSchedule]:
+    routines = [
+        ("ring_fit", 1, "リングフィット"),
+        ("gym", 6, "朝のジム"),
+    ]
+    result = []
+    weekdays = "月火水木金土日"
+    for key, weekday, title in routines:
+        target = _next_weekday(today, weekday)
+        completed = db.query(ScheduleBlock).filter(
+            ScheduleBlock.date == target,
+            ScheduleBlock.category == "workout",
+            ScheduleBlock.completed.is_(True),
+        ).first()
+        if target == today and completed:
+            target += timedelta(days=7)
+            completed = None
+        planned = db.query(ScheduleBlock).filter(
+            ScheduleBlock.date == target,
+            ScheduleBlock.category == "workout",
+            ScheduleBlock.title.contains("ジム" if key == "gym" else "リング"),
+        ).first()
+        result.append((target, FocusFixedSchedule(
+            key=key,
+            title=title,
+            date_label="今日" if target == today else f"{target.month}/{target.day}({weekdays[target.weekday()]})",
+            status="done" if completed else "planned" if planned else "upcoming",
+        )))
+    return [item for _, item in sorted(result, key=lambda pair: pair[0])]
+
+
+def _weekly_maintenance(db: Session, today: date) -> list[FocusMaintenance]:
+    start = today - timedelta(days=today.weekday())
+    end = start + timedelta(days=6)
+    definitions = [
+        ("publish", "なろう・発信", {"social"}),
+        ("job_search", "転職活動", {"job_search"}),
+    ]
+    result = []
+    for key, title, categories in definitions:
+        blocks = db.query(ScheduleBlock).filter(
+            ScheduleBlock.date >= start,
+            ScheduleBlock.date <= end,
+            ScheduleBlock.category.in_(categories),
+        ).all()
+        done = any(block.completed for block in blocks)
+        planned = bool(blocks)
+        result.append(FocusMaintenance(
+            key=key,
+            title=title,
+            status="done" if done else "planned" if planned else "pending",
+            status_label="実施済み" if done else "予定あり" if planned else "今週まだ",
+        ))
+    return result
 
 
 def _minutes_between(start, end) -> int:
@@ -633,8 +715,24 @@ def get_focus_home(db: Session = Depends(get_db)):
 
     latest_log = db.query(DailyLog).order_by(DailyLog.date.desc()).first()
     today_log = latest_log if latest_log and latest_log.date == today else None
+    primary_dream = (
+        db.query(Dream)
+        .filter(Dream.category == "creation")
+        .order_by(
+            (Dream.title.contains("ゲーム")).desc(),
+            (Dream.title.contains("Steam")).desc(),
+            Dream.updated_at.desc(),
+        )
+        .first()
+    )
     current_seed = (
         db.query(SeedTask)
+        .filter(SeedTask.status.in_(["planted", "active"]))
+        .filter(SeedTask.category == "creation")
+        .filter((SeedTask.dream_id == primary_dream.id) if primary_dream else True)
+        .order_by((SeedTask.status == "planted").desc(), SeedTask.updated_at.desc())
+        .first()
+        or db.query(SeedTask)
         .filter(SeedTask.status.in_(["planted", "active"]))
         .order_by((SeedTask.status == "planted").desc(), SeedTask.updated_at.desc())
         .first()
@@ -645,6 +743,22 @@ def get_focus_home(db: Session = Depends(get_db)):
             ScheduleBlock.seed_task_id.is_not(None),
         ).all()
     }
+    now = datetime.now()
+    nearby_block = (
+        db.query(ScheduleBlock)
+        .filter(
+            ScheduleBlock.date == today,
+            ScheduleBlock.category != "work",
+            ScheduleBlock.completed.is_(False),
+            ScheduleBlock.start_time >= now.time(),
+        )
+        .order_by(ScheduleBlock.start_time.asc())
+        .first()
+    )
+    if nearby_block:
+        start_at = datetime.combine(today, nearby_block.start_time)
+        if (start_at - now).total_seconds() > 2 * 60 * 60:
+            nearby_block = None
     due_undone = [
         habit for habit in habits if habit.status == "today"
     ]
@@ -679,6 +793,14 @@ def get_focus_home(db: Session = Depends(get_db)):
             reason="最低ラインは10分。身体との接続を軽く保つ日です。",
             standard_minutes=30, minimum_minutes=10, minimum_label="10分だけ身体を動かす",
         )
+    elif nearby_block:
+        minutes = _minutes_between(nearby_block.start_time, nearby_block.end_time)
+        action = FocusAction(
+            kind="calendar", key=nearby_block.category, icon="▶", title=nearby_block.title,
+            reason=f"{nearby_block.start_time.strftime('%H:%M')}からの予定です。今はこれだけ見れば大丈夫です。",
+            standard_minutes=minutes, minimum_minutes=min(5, minutes),
+            minimum_label=f"{min(5, minutes)}分だけ着手する",
+        )
     elif hour >= 22 and due_undone:
         habit = due_undone[0]
         definition = FOCUS_HABITS[habit.key]
@@ -689,13 +811,13 @@ def get_focus_home(db: Session = Depends(get_db)):
             standard_minutes=habit.standard_minutes, minimum_minutes=habit.minimum_minutes,
             minimum_label=definition["minimum_label"],
         )
-    elif current_seed and current_seed.id not in planted_seed_ids and today.weekday() in {2, 5}:
+    elif current_seed and current_seed.id not in planted_seed_ids and today.weekday() == 5:
         action = FocusAction(
             kind="seed", key=current_seed.category, seed_id=current_seed.id,
             icon="💎" if current_seed.category == "creation" else "🌱",
             title=current_seed.title,
             reason=current_seed.purpose or "夢を、今日の小さな行動へ変えます。",
-            standard_minutes=current_seed.estimated_minutes,
+            standard_minutes=max(120, current_seed.estimated_minutes),
             minimum_minutes=min(10, current_seed.estimated_minutes),
             minimum_label=f"{min(10, current_seed.estimated_minutes)}分だけ続きを開く",
         )
@@ -753,6 +875,12 @@ def get_focus_home(db: Session = Depends(get_db)):
             text=principle.insight,
         ),
         creation_resume_note=creation_resume_note.note if creation_resume_note else None,
+        primary_project=FocusPrimaryProject(
+            title=primary_dream.title,
+            progress=primary_dream.progress,
+        ) if primary_dream else None,
+        fixed_schedules=_fixed_schedule_summary(db, today),
+        maintenance=_weekly_maintenance(db, today),
     )
 
 

@@ -381,6 +381,9 @@ export interface FocusHome {
   fields: FocusField[];
   principle: { id: number; icon: string; title: string; text: string };
   creation_resume_note: string | null;
+  primary_project: { title: string; progress: number } | null;
+  fixed_schedules: { key: string; title: string; date_label: string; status: "done" | "planned" | "upcoming" }[];
+  maintenance: { key: string; title: string; status: "done" | "planned" | "pending"; status_label: string }[];
 }
 
 export const fetchFocusHome = () =>

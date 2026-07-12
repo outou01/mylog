@@ -1,11 +1,17 @@
 import unittest
+from datetime import date
 
-from app.routers.dashboard import FOCUS_HABITS, _connection_state, _habit_schedule_marker
+from app.routers.dashboard import FOCUS_HABITS, _connection_state, _habit_schedule_marker, _next_weekday
 
 
 class ConnectionStateTest(unittest.TestCase):
     def test_home_habit_calendar_marker_is_stable(self):
         self.assertEqual(_habit_schedule_marker("reading"), "[home-habit:reading]")
+
+    def test_fixed_routine_uses_next_tuesday_and_sunday(self):
+        sunday = date(2026, 7, 12)
+        self.assertEqual(_next_weekday(sunday, 1), date(2026, 7, 14))
+        self.assertEqual(_next_weekday(sunday, 6), sunday)
 
     def test_creation_minimum_connection_is_five_minutes(self):
         self.assertEqual(FOCUS_HABITS["creation"]["minimum"], 5)
