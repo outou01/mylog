@@ -95,6 +95,7 @@
   font-size: 0.82rem;
   margin: 0.55rem 0 0;
 }
+.focus-pillar-link { display: inline-block; color: #8fc698; font-size: 0.7rem; margin-top: 0.65rem; }
 
 .focus-primary {
   display: inline-flex;
@@ -356,6 +357,7 @@
 .daily-principle details { margin-top: 0.5rem; }
 .daily-principle summary { color: #899789; cursor: pointer; font-size: 0.72rem; }
 .daily-principle details p { max-width: 780px; color: #aebbaa; line-height: 1.7; margin: 0.5rem 0 0; }
+.principle-blueprint-link { display: inline-block; color: #79877e; font-size: 0.66rem; margin-top: 0.45rem; }
 
 .home-calendar > .calendar-page { margin-top: 1rem; }
 .home-calendar .cal-tabs { display: none; }

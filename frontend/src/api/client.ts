@@ -395,5 +395,8 @@ export const updateFocusHabit = (key: string, minutes: number) =>
 export const updateCreationResumeNote = (note: string) =>
   api.put<{ note: string }>("/dashboard/focus/resume-note/creation", { note }).then((r) => r.data);
 
+export const fetchFocusInsights = () =>
+  api.get<{ id: number; icon: string; title: string; text: string }[]>("/dashboard/focus/insights").then((r) => r.data);
+
 export const updateDashboardPurpose = (text: string) =>
   api.patch<{ text: string }>("/dashboard/purpose", { text }).then((r) => r.data);

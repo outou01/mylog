@@ -12,6 +12,7 @@ import MonthLog from "./pages/MonthLog";
 import PatternAnalysis from "./pages/PatternAnalysis";
 import PrivateLife from "./pages/PrivateLife";
 import Seeds from "./pages/Seeds";
+import Blueprint from "./pages/Blueprint";
 import AriaPresence from "./components/AriaPresence";
 import "./App.css";
 
@@ -30,6 +31,7 @@ export default function App() {
             <NavLink to="/dreams">夢</NavLink>
             <NavLink to="/seeds">種リスト</NavLink>
             <NavLink to="/calendar">畑</NavLink>
+            <NavLink to="/blueprint">設計図</NavLink>
           </nav>
         </div>
       </header>
@@ -41,6 +43,7 @@ export default function App() {
             <Route path="/dreams/:id" element={<DreamDetail />} />
             <Route path="/seeds" element={<Seeds />} />
             <Route path="/calendar" element={<Calendar />} />
+            <Route path="/blueprint" element={<Blueprint />} />
 
             <Route path="/private" element={<Navigate to="/calendar" replace />} />
             <Route path="/private/soil" element={<Navigate to="/calendar" replace />} />

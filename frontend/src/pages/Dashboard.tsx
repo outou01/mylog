@@ -65,6 +65,13 @@ function displayHabitStatus(habit: FocusHabit) {
   return habit.status;
 }
 
+function actionPillar(key: string) {
+  if (key === "creation") return { label: "作り切る", anchor: "complete" };
+  if (key === "social") return { label: "届ける", anchor: "deliver" };
+  if (["reading", "job_search"].includes(key)) return { label: "磨き続ける", anchor: "sharpen" };
+  return null;
+}
+
 export default function Dashboard() {
   const [home, setHome] = useState<FocusHome | null>(null);
   const [selectedHabit, setSelectedHabit] = useState<FocusHabit | null>(null);
@@ -158,6 +165,7 @@ export default function Dashboard() {
 
   const actionHabit = home.habits.find((habit) => habit.key === home.action.key);
   const selectedCopy = selectedHabit ? HABIT_COPY[selectedHabit.key] : null;
+  const pillar = actionPillar(home.action.key);
 
   return (
     <main className="focus-home">
@@ -172,6 +180,7 @@ export default function Dashboard() {
           {home.action.minimum_minutes > 0 && (
             <p className="focus-minimum">最低ライン：{home.action.minimum_label}</p>
           )}
+          {pillar && <Link className="focus-pillar-link" to={`/blueprint#pillar-${pillar.anchor}`}>つながる柱：{pillar.label} →</Link>}
         </div>
 
         {home.action.kind === "habit" && actionHabit && (
@@ -347,6 +356,7 @@ export default function Dashboard() {
             <summary>続きを読む</summary>
             <p>{home.principle.text}</p>
           </details>
+          <Link className="principle-blueprint-link" to="/blueprint#principles">設計図で見る →</Link>
         </div>
       </section>
 
