@@ -15,6 +15,11 @@ class ConnectionStateTest(unittest.TestCase):
 
     def test_creation_minimum_connection_is_five_minutes(self):
         self.assertEqual(FOCUS_HABITS["creation"]["minimum"], 5)
+        self.assertEqual(FOCUS_HABITS["creation"]["standard"], 15)
+
+    def test_creation_is_due_every_day(self):
+        from app.routers.dashboard import _habit_is_due
+        self.assertTrue(all(_habit_is_due("creation", weekday) for weekday in range(7)))
 
     def test_touch_today_is_connected(self):
         self.assertEqual(_connection_state("creation", 0, 0), ("今日も接続中", "hot"))

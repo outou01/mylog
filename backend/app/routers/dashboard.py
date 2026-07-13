@@ -276,18 +276,18 @@ FOCUS_HABITS = {
         "minimum_label": "本を2ページだけ読む", "cue": "休憩か就寝前", "field": "knowledge",
     },
     "creation": {
-        "label": "創作", "icon": "🎨", "standard": 30, "minimum": 5,
+        "label": "創作", "icon": "🎨", "standard": 15, "minimum": 5,
         "minimum_label": "原稿を5分だけ開く", "cue": "自分の時間が始まったら", "field": "creation",
     },
 }
 
 
 def _habit_is_due(key: str, weekday: int) -> bool:
-    if key == "meditation":
+    if key in {"meditation", "creation"}:
         return True
     if key == "reading":
         return weekday in {0, 3, 6}
-    return weekday in {1, 2, 5}
+    return False
 
 
 def _seed_focus_defaults(db: Session) -> None:
