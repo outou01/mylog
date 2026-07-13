@@ -218,6 +218,18 @@
   font-size: 0.76rem;
 }
 
+.schedule-block.overlapping {
+  padding-inline: 0.3rem;
+}
+
+.schedule-block.overlapping span,
+.schedule-block.overlapping strong {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .schedule-block.work {
   background: rgba(90, 105, 125, 0.36);
   border-color: rgba(148, 163, 184, 0.22);

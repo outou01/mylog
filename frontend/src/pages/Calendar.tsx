@@ -74,14 +74,64 @@ function displayDate(dateText: string) {
   return `${d.getMonth() + 1}/${d.getDate()}`;
 }
 
-function blockStyle(block: ScheduleBlock, schedule: WeekSchedule) {
+type PositionedBlock = {
+  block: ScheduleBlock;
+  column: number;
+  columns: number;
+};
+
+function layoutDayBlocks(blocks: ScheduleBlock[]): PositionedBlock[] {
+  const sorted = [...blocks].sort((a, b) => (
+    minutesOf(a.start_time) - minutesOf(b.start_time)
+    || minutesOf(a.end_time) - minutesOf(b.end_time)
+  ));
+  const groups: ScheduleBlock[][] = [];
+  let current: ScheduleBlock[] = [];
+  let groupEnd = -1;
+
+  sorted.forEach((block) => {
+    const start = minutesOf(block.start_time);
+    const end = minutesOf(block.end_time);
+    if (current.length > 0 && start >= groupEnd) {
+      groups.push(current);
+      current = [];
+      groupEnd = -1;
+    }
+    current.push(block);
+    groupEnd = Math.max(groupEnd, end);
+  });
+  if (current.length > 0) groups.push(current);
+
+  return groups.flatMap((group) => {
+    const columnEnds: number[] = [];
+    const placed = group.map((block) => {
+      const start = minutesOf(block.start_time);
+      let column = columnEnds.findIndex((end) => end <= start);
+      if (column === -1) column = columnEnds.length;
+      columnEnds[column] = minutesOf(block.end_time);
+      return { block, column };
+    });
+    const columns = Math.max(1, columnEnds.length);
+    return placed.map(({ block, column }) => ({ block, column, columns }));
+  });
+}
+
+function blockStyle(block: ScheduleBlock, schedule: WeekSchedule, column = 0, columns = 1) {
   const dayStart = schedule.day_start_hour * 60;
   const total = (schedule.day_end_hour - schedule.day_start_hour) * 60;
   const top = ((minutesOf(block.start_time) - dayStart) / total) * 100;
   const height = ((minutesOf(block.end_time) - minutesOf(block.start_time)) / total) * 100;
+  const horizontal = columns > 1
+    ? {
+        left: `calc(${(column / columns) * 100}% + 3px)`,
+        right: "auto",
+        width: `calc(${100 / columns}% - 6px)`,
+      }
+    : { left: "5px", right: "5px", width: "auto" };
   return {
     top: `${Math.max(0, top)}%`,
     height: `${Math.max(4, height)}%`,
+    ...horizontal,
   };
 }
 
@@ -291,6 +341,7 @@ export default function Calendar({ embedded = false }: { embedded?: boolean }) {
                 </div>
                 {weekDays.map((day, index) => {
                   const dayBlocks = schedule.blocks.filter((block) => block.date === day);
+                  const positionedBlocks = layoutDayBlocks(dayBlocks);
                   return (
                     <div className="day-col" key={day}>
                       <div className={`day-head ${day === today ? "today" : ""}`}>
@@ -312,11 +363,11 @@ export default function Calendar({ embedded = false }: { embedded?: boolean }) {
                           }
                         }}
                       >
-                        {dayBlocks.map((block, blockIndex) => (
+                        {positionedBlocks.map(({ block, column, columns }, blockIndex) => (
                           <button
                             key={`${block.id ?? "work"}-${block.date}-${block.start_time}-${blockIndex}`}
-                            className={`schedule-block ${block.category} ${block.editable ? "editable" : ""} ${draggingId === block.id ? "dragging" : ""}`}
-                            style={blockStyle(block, schedule)}
+                            className={`schedule-block ${block.category} ${columns > 1 ? "overlapping" : ""} ${block.editable ? "editable" : ""} ${draggingId === block.id ? "dragging" : ""}`}
+                            style={blockStyle(block, schedule, column, columns)}
                             draggable={block.editable}
                             onDragStart={(event) => {
                               if (!block.editable || block.id == null) return;

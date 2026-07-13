@@ -565,22 +565,12 @@ def _soil_events(db: Session, start: date | None = None, end: date | None = None
 
 
 def _connection_events(db: Session, start: date, end: date) -> list[dict]:
-    """Actual touches only: manual logs, habit checks, and completed calendar blocks."""
-    events = [
-        event for event in _soil_events(db, start=start, end=end)
-        if event["source_type"] != "calendar"
-    ]
-    completed = db.query(ScheduleBlock).filter(
-        ScheduleBlock.date >= start,
-        ScheduleBlock.date <= end,
-        ScheduleBlock.category != "work",
-        ScheduleBlock.completed.is_(True),
-    ).all()
-    for block in completed:
-        event = _schedule_event(block)
-        if event:
-            events.append(event)
-    return sorted(events, key=lambda item: (item["performed_on"], abs(item["id"])), reverse=True)
+    """Use the same category events for connection state and field growth.
+
+    Calendar blocks are the app's shared record of committed personal time. Keeping
+    planned blocks here makes Home, Calendar, and field growth agree immediately.
+    """
+    return _soil_events(db, start=start, end=end)
 
 
 def _compute_field_scores(db: Session) -> tuple[dict[str, int], dict[str, list[dict]]]:

@@ -1,5 +1,6 @@
 import unittest
 from datetime import date, datetime, time
+from types import SimpleNamespace
 
 from app.routers.dashboard import (
     FOCUS_HABITS,
@@ -7,6 +8,7 @@ from app.routers.dashboard import (
     _habit_schedule_marker,
     _habit_schedule_times,
     _next_weekday,
+    _seed_is_planted_today,
 )
 
 
@@ -39,6 +41,12 @@ class ConnectionStateTest(unittest.TestCase):
     def test_creation_is_due_every_day(self):
         from app.routers.dashboard import _habit_is_due
         self.assertTrue(all(_habit_is_due("creation", weekday) for weekday in range(7)))
+
+    def test_category_schedule_satisfies_seed_suggestion(self):
+        seed = SimpleNamespace(id=42, category="creation")
+        self.assertTrue(_seed_is_planted_today(seed, set(), {"creation"}))
+        self.assertTrue(_seed_is_planted_today(seed, {42}, set()))
+        self.assertFalse(_seed_is_planted_today(seed, set(), {"reading"}))
 
     def test_touch_today_is_connected(self):
         self.assertEqual(_connection_state("creation", 0, 0), ("今日も接続中", "hot"))

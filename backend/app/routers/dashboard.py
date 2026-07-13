@@ -584,6 +584,11 @@ def _seed_summary(seed: SeedTask, today: date, db: Session) -> CurrentSeedSummar
     )
 
 
+def _seed_is_planted_today(seed: SeedTask, seed_ids: set[int], categories: set[str]) -> bool:
+    """A category-level calendar commitment also satisfies today's seed suggestion."""
+    return seed.id in seed_ids or seed.category in categories
+
+
 def _fallback_aria(latest_log: DailyLog | None, weekly_minutes: int, seed: SeedTask | None) -> AriaSummary:
     next_hint = f"「{seed.title}」" if seed else "小さな一歩"
     today = date.today()
@@ -759,6 +764,12 @@ def get_focus_home(db: Session = Depends(get_db)):
             ScheduleBlock.seed_task_id.is_not(None),
         ).all()
     }
+    planted_categories = {
+        row[0] for row in db.query(ScheduleBlock.category).filter(
+            ScheduleBlock.date == today,
+            ScheduleBlock.category != "work",
+        ).distinct().all()
+    }
     now = datetime.now()
     nearby_block = (
         db.query(ScheduleBlock)
@@ -827,7 +838,11 @@ def get_focus_home(db: Session = Depends(get_db)):
             standard_minutes=habit.standard_minutes, minimum_minutes=habit.minimum_minutes,
             minimum_label=definition["minimum_label"],
         )
-    elif current_seed and current_seed.id not in planted_seed_ids and today.weekday() == 5:
+    elif (
+        current_seed
+        and not _seed_is_planted_today(current_seed, planted_seed_ids, planted_categories)
+        and today.weekday() == 5
+    ):
         action = FocusAction(
             kind="seed", key=current_seed.category, seed_id=current_seed.id,
             icon="💎" if current_seed.category == "creation" else "🌱",
@@ -847,7 +862,7 @@ def get_focus_home(db: Session = Depends(get_db)):
             standard_minutes=habit.standard_minutes, minimum_minutes=habit.minimum_minutes,
             minimum_label=definition["minimum_label"],
         )
-    elif current_seed and current_seed.id not in planted_seed_ids:
+    elif current_seed and not _seed_is_planted_today(current_seed, planted_seed_ids, planted_categories):
         action = FocusAction(
             kind="seed", key=current_seed.category, seed_id=current_seed.id,
             icon="💎" if current_seed.category == "creation" else "🌱",
