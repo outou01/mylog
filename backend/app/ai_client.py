@@ -1,5 +1,7 @@
 """Unified AI client — tries Gemini first, then OpenAI, then returns None."""
 import json
+from urllib import error, parse, request
+
 from app.config import settings
 
 
@@ -13,14 +15,36 @@ def chat(prompt: str, temperature: float = 0.7) -> str | None:
 
 
 def _gemini(prompt: str, temperature: float) -> str:
-    import google.generativeai as genai
-    genai.configure(api_key=settings.gemini_api_key)
-    model = genai.GenerativeModel(
-        settings.gemini_model,
-        generation_config={"temperature": temperature},
+    model = parse.quote(settings.gemini_model, safe="")
+    query = parse.urlencode({"key": settings.gemini_api_key})
+    endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?{query}"
+    payload = json.dumps({
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {
+            "temperature": temperature,
+            "thinkingConfig": {"thinkingLevel": "minimal"},
+        },
+    }, ensure_ascii=False).encode("utf-8")
+    api_request = request.Request(
+        endpoint,
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
     )
-    response = model.generate_content(prompt)
-    return response.text
+    try:
+        with request.urlopen(api_request, timeout=15) as response:
+            data = json.loads(response.read().decode("utf-8"))
+    except error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"Gemini API HTTP {exc.code}: {detail[:500]}") from exc
+    except error.URLError as exc:
+        raise RuntimeError(f"Gemini API connection failed: {exc.reason}") from exc
+
+    parts = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
+    text = "".join(part.get("text", "") for part in parts).strip()
+    if not text:
+        raise RuntimeError(f"Gemini API returned no text: {json.dumps(data, ensure_ascii=False)[:500]}")
+    return text
 
 
 def _openai(prompt: str, temperature: float) -> str:

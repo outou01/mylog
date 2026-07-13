@@ -268,12 +268,14 @@ def _generate_schedule_message(today: date, blocks: list[ScheduleBlock]) -> tupl
     executor = ThreadPoolExecutor(max_workers=1)
     future = executor.submit(chat, prompt, 0.9)
     try:
-        raw = future.result(timeout=4.5)
+        raw = future.result(timeout=12)
     except TimeoutError:
         future.cancel()
         executor.shutdown(wait=False, cancel_futures=True)
+        print("[Calendar] Gemini schedule message timed out after 12 seconds")
         raw = None
-    except Exception:
+    except Exception as exc:
+        print(f"[Calendar] Gemini schedule message failed: {type(exc).__name__}: {exc}")
         raw = None
     finally:
         if future.done():
@@ -614,14 +616,6 @@ def create_schedule_message(week_start: date | None = None, db: Session = Depend
     stored = db.query(ScheduleMessage).filter(ScheduleMessage.message_date == today).first()
     if stored and not stored.is_fallback:
         return ScheduleMessageOut(message=stored.message, is_fallback=False)
-    if stored and stored.is_fallback and stored.updated_at:
-        elapsed = (datetime.now() - stored.updated_at).total_seconds()
-        if elapsed < 30 * 60:
-            return ScheduleMessageOut(
-                message=stored.message.replace(" ※自動生成", ""),
-                is_fallback=True,
-            )
-
     blocks = (
         db.query(ScheduleBlock)
         .filter(ScheduleBlock.date >= start, ScheduleBlock.date <= end)
