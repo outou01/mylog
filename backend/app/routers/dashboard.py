@@ -1,6 +1,6 @@
 import time as time_module
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -350,6 +350,23 @@ def _habit_schedule_marker(habit_key: str) -> str:
     return f"[home-habit:{habit_key}]"
 
 
+def _habit_schedule_times(
+    minutes: int,
+    existing_start: time | None = None,
+    existing_end: time | None = None,
+    now: datetime | None = None,
+) -> tuple[time, time]:
+    """Choose an initial slot without overwriting a slot moved in the calendar."""
+    if existing_start is not None and existing_end is not None:
+        return existing_start, existing_end
+    current = now or datetime.now()
+    end_minutes = max(1, current.hour * 60 + current.minute)
+    start_minutes = max(0, end_minutes - minutes)
+    start_time = datetime.strptime(f"{start_minutes // 60:02d}:{start_minutes % 60:02d}", "%H:%M").time()
+    end_time = datetime.strptime(f"{end_minutes // 60:02d}:{end_minutes % 60:02d}", "%H:%M").time()
+    return start_time, end_time
+
+
 def _sync_habit_schedule_blocks(db: Session, target_date: date) -> bool:
     """Mirror home habit checks into completed calendar blocks without duplicating growth logs."""
     checks = db.query(HabitCheck).filter(
@@ -369,15 +386,14 @@ def _sync_habit_schedule_blocks(db: Session, target_date: date) -> bool:
                 db.delete(block)
                 changed = True
             continue
-        end_minutes = max(1, datetime.now().hour * 60 + datetime.now().minute)
-        start_minutes = max(0, end_minutes - check.minutes)
-        start_time = datetime.strptime(f"{start_minutes // 60:02d}:{start_minutes % 60:02d}", "%H:%M").time()
-        end_time = datetime.strptime(f"{end_minutes // 60:02d}:{end_minutes % 60:02d}", "%H:%M").time()
+        start_time, end_time = _habit_schedule_times(
+            check.minutes,
+            block.start_time if block else None,
+            block.end_time if block else None,
+        )
         definition = FOCUS_HABITS[check.habit_key]
         if block:
-            if block.start_time != start_time or block.end_time != end_time or not block.completed:
-                block.start_time = start_time
-                block.end_time = end_time
+            if not block.completed:
                 block.completed = True
                 changed = True
         else:

@@ -1,12 +1,31 @@
 import unittest
-from datetime import date
+from datetime import date, datetime, time
 
-from app.routers.dashboard import FOCUS_HABITS, _connection_state, _habit_schedule_marker, _next_weekday
+from app.routers.dashboard import (
+    FOCUS_HABITS,
+    _connection_state,
+    _habit_schedule_marker,
+    _habit_schedule_times,
+    _next_weekday,
+)
 
 
 class ConnectionStateTest(unittest.TestCase):
     def test_home_habit_calendar_marker_is_stable(self):
         self.assertEqual(_habit_schedule_marker("reading"), "[home-habit:reading]")
+
+    def test_home_habit_gets_an_initial_slot_ending_now(self):
+        start, end = _habit_schedule_times(10, now=datetime(2026, 7, 13, 21, 13))
+        self.assertEqual((start, end), (time(21, 3), time(21, 13)))
+
+    def test_home_habit_keeps_a_slot_moved_in_calendar(self):
+        start, end = _habit_schedule_times(
+            10,
+            existing_start=time(7, 30),
+            existing_end=time(7, 40),
+            now=datetime(2026, 7, 13, 21, 13),
+        )
+        self.assertEqual((start, end), (time(7, 30), time(7, 40)))
 
     def test_fixed_routine_uses_next_tuesday_and_sunday(self):
         sunday = date(2026, 7, 12)

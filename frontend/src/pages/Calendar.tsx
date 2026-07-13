@@ -93,6 +93,10 @@ function toPayload(block: ScheduleBlock): ScheduleBlockPayload {
     title: block.title,
     category: block.category,
     note: block.note ?? "",
+    dream_id: block.dream_id,
+    project_id: block.project_id,
+    seed_task_id: block.seed_task_id,
+    completed: block.completed,
   };
 }
 
