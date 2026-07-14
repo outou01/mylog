@@ -197,6 +197,7 @@
   text-align: left;
   font-size: 0.72rem;
   line-height: 1.25;
+  z-index: 2;
 }
 
 .schedule-block[draggable="true"] {
@@ -231,8 +232,15 @@
 }
 
 .schedule-block.work {
-  background: rgba(90, 105, 125, 0.36);
-  border-color: rgba(148, 163, 184, 0.22);
+  left: 0 !important;
+  right: 0 !important;
+  width: auto !important;
+  z-index: 0;
+  pointer-events: none;
+  border-color: rgba(148, 163, 184, 0.14);
+  border-radius: 3px;
+  background: rgba(90, 105, 125, 0.2);
+  box-shadow: none;
 }
 
 .schedule-block.self {
@@ -632,8 +640,8 @@
 }
 
 .schedule-block.work {
-  background: rgba(73, 86, 99, 0.3);
-  border-color: rgba(148, 163, 184, 0.18);
+  background: rgba(73, 86, 99, 0.2);
+  border-color: rgba(148, 163, 184, 0.14);
   color: #aeb8c1;
 }
 

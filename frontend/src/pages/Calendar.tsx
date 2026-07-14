@@ -83,7 +83,10 @@ type PositionedBlock = {
 const MIN_BLOCK_HEIGHT_PERCENT = 4;
 
 function layoutDayBlocks(blocks: ScheduleBlock[], minimumDisplayMinutes: number): PositionedBlock[] {
-  const sorted = [...blocks].sort((a, b) => (
+  const background = blocks
+    .filter((block) => block.category === "work")
+    .map((block) => ({ block, column: 0, columns: 1 }));
+  const sorted = blocks.filter((block) => block.category !== "work").sort((a, b) => (
     minutesOf(a.start_time) - minutesOf(b.start_time)
     || minutesOf(a.end_time) - minutesOf(b.end_time)
   ));
@@ -104,7 +107,7 @@ function layoutDayBlocks(blocks: ScheduleBlock[], minimumDisplayMinutes: number)
   });
   if (current.length > 0) groups.push(current);
 
-  return groups.flatMap((group) => {
+  const foreground = groups.flatMap((group) => {
     const columnEnds: number[] = [];
     const placed = group.map((block) => {
       const start = minutesOf(block.start_time);
@@ -116,6 +119,7 @@ function layoutDayBlocks(blocks: ScheduleBlock[], minimumDisplayMinutes: number)
     const columns = Math.max(1, columnEnds.length);
     return placed.map(({ block, column }) => ({ block, column, columns }));
   });
+  return [...background, ...foreground];
 }
 
 function blockStyle(block: ScheduleBlock, schedule: WeekSchedule, column = 0, columns = 1) {
@@ -380,25 +384,43 @@ export default function Calendar({
                           }
                         }}
                       >
-                        {positionedBlocks.map(({ block, column, columns }, blockIndex) => (
-                          <button
-                            key={`${block.id ?? "work"}-${block.date}-${block.start_time}-${blockIndex}`}
-                            className={`schedule-block ${block.category} ${columns > 1 ? "overlapping" : ""} ${block.editable ? "editable" : ""} ${draggingId === block.id ? "dragging" : ""}`}
-                            style={blockStyle(block, schedule, column, columns)}
-                            draggable={block.editable}
-                            onDragStart={(event) => {
-                              if (!block.editable || block.id == null) return;
-                              setDraggingId(block.id);
-                              event.dataTransfer.effectAllowed = "move";
-                              event.dataTransfer.setData("text/plain", String(block.id));
-                            }}
-                            onDragEnd={() => setDraggingId(null)}
-                            onClick={() => startEdit(block)}
-                          >
-                            <span>{block.start_time}-{block.end_time}</span>
-                            <strong>{block.title}</strong>
-                          </button>
-                        ))}
+                        {positionedBlocks.map(({ block, column, columns }, blockIndex) => {
+                          const key = `${block.id ?? "work"}-${block.date}-${block.start_time}-${blockIndex}`;
+                          const className = `schedule-block ${block.category} ${columns > 1 ? "overlapping" : ""} ${block.editable ? "editable" : ""} ${draggingId === block.id ? "dragging" : ""}`;
+                          const content = (
+                            <>
+                              <span>{block.start_time}-{block.end_time}</span>
+                              <strong>{block.title}</strong>
+                            </>
+                          );
+
+                          if (!block.editable) {
+                            return (
+                              <div key={key} className={className} style={blockStyle(block, schedule, column, columns)} aria-label={`${block.start_time}-${block.end_time} ${block.title}`}>
+                                {content}
+                              </div>
+                            );
+                          }
+
+                          return (
+                            <button
+                              key={key}
+                              className={className}
+                              style={blockStyle(block, schedule, column, columns)}
+                              draggable
+                              onDragStart={(event) => {
+                                if (block.id == null) return;
+                                setDraggingId(block.id);
+                                event.dataTransfer.effectAllowed = "move";
+                                event.dataTransfer.setData("text/plain", String(block.id));
+                              }}
+                              onDragEnd={() => setDraggingId(null)}
+                              onClick={() => startEdit(block)}
+                            >
+                              {content}
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
                   );
