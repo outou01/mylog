@@ -15,7 +15,6 @@ from app.models import (
     DailyLog,
     DashboardSetting,
     Dream,
-    HabitCheck,
     InsightSeed,
     ResumeNote,
     ScheduleBlock,
@@ -310,20 +309,22 @@ def _seed_focus_defaults(db: Session) -> None:
     db.commit()
 
 
-def _focus_habits(db: Session, today: date, connection_events: list[dict]) -> list[FocusHabit]:
-    checks = {
-        row.habit_key: row
-        for row in db.query(HabitCheck).filter(HabitCheck.check_date == today).all()
-    }
-    result: list[tuple[date, FocusFixedSchedule]] = []
+def _category_minutes(blocks: list[ScheduleBlock], category: str) -> int:
+    return sum(
+        _minutes_between(block.start_time, block.end_time)
+        for block in blocks
+        if block.category == category
+    )
+
+
+def _focus_habits(db: Session, today: date) -> list[FocusHabit]:
+    blocks = db.query(ScheduleBlock).filter(
+        ScheduleBlock.date == today,
+        ScheduleBlock.category.in_(FOCUS_HABITS.keys()),
+    ).all()
+    result: list[FocusHabit] = []
     for key, definition in FOCUS_HABITS.items():
-        check = checks.get(key)
-        field_minutes = sum(
-            event["duration_minutes"] or 0
-            for event in connection_events
-            if event["performed_on"] == today and event["category_key"] == definition["field"]
-        )
-        completed_minutes = max(check.minutes if check else 0, field_minutes)
+        completed_minutes = _category_minutes(blocks, key)
         due = _habit_is_due(key, today.weekday())
         if completed_minutes >= definition["standard"]:
             status = "done"
@@ -365,51 +366,6 @@ def _habit_schedule_times(
     start_time = datetime.strptime(f"{start_minutes // 60:02d}:{start_minutes % 60:02d}", "%H:%M").time()
     end_time = datetime.strptime(f"{end_minutes // 60:02d}:{end_minutes % 60:02d}", "%H:%M").time()
     return start_time, end_time
-
-
-def _sync_habit_schedule_blocks(db: Session, target_date: date) -> bool:
-    """Mirror home habit checks into completed calendar blocks without duplicating growth logs."""
-    checks = db.query(HabitCheck).filter(
-        HabitCheck.check_date == target_date,
-    ).all()
-    changed = False
-    for check in checks:
-        if check.habit_key not in FOCUS_HABITS:
-            continue
-        marker = _habit_schedule_marker(check.habit_key)
-        block = db.query(ScheduleBlock).filter(
-            ScheduleBlock.date == target_date,
-            ScheduleBlock.note == marker,
-        ).first()
-        if check.minutes <= 0:
-            if block:
-                db.delete(block)
-                changed = True
-            continue
-        start_time, end_time = _habit_schedule_times(
-            check.minutes,
-            block.start_time if block else None,
-            block.end_time if block else None,
-        )
-        definition = FOCUS_HABITS[check.habit_key]
-        if block:
-            if not block.completed:
-                block.completed = True
-                changed = True
-        else:
-            db.add(ScheduleBlock(
-                date=target_date,
-                start_time=start_time,
-                end_time=end_time,
-                title=definition["label"],
-                category=check.habit_key,
-                note=marker,
-                completed=True,
-            ))
-            changed = True
-    if changed:
-        db.commit()
-    return changed
 
 
 def _connection_state(category_key: str, days_since: int | None, weekday: int) -> tuple[str, str]:
@@ -710,12 +666,11 @@ JSONのみ（顔文字はfaceにだけ入れ、messageには入れない）:
 def get_focus_home(db: Session = Depends(get_db)):
     today = date.today()
     hour = datetime.now().hour
-    _sync_habit_schedule_blocks(db, today)
 
     from app.routers.soil import CATEGORIES as SOIL_CATEGORIES, _compute_field_scores, _connection_events
     scores, _ = _compute_field_scores(db)
     connection_events = _connection_events(db, today - timedelta(days=30), today)
-    habits = _focus_habits(db, today, connection_events)
+    habits = _focus_habits(db, today)
     connection_by_category = {
         item["key"]: [event for event in connection_events if event["category_key"] == item["key"]]
         for item in SOIL_CATEGORIES
@@ -920,23 +875,54 @@ def update_focus_habit(habit_key: str, payload: HabitCheckPayload, db: Session =
     if habit_key not in FOCUS_HABITS:
         raise HTTPException(status_code=404, detail="Habit not found")
     today = date.today()
-    row = db.query(HabitCheck).filter(
-        HabitCheck.habit_key == habit_key,
-        HabitCheck.check_date == today,
+    marker = _habit_schedule_marker(habit_key)
+    block = db.query(ScheduleBlock).filter(
+        ScheduleBlock.date == today,
+        ScheduleBlock.note == marker,
     ).first()
-    if row:
-        row.minutes = payload.minutes
+    if payload.minutes <= 0:
+        if block:
+            db.delete(block)
     else:
-        row = HabitCheck(habit_key=habit_key, check_date=today, minutes=payload.minutes)
-        db.add(row)
+        start_time, end_time = _habit_schedule_times(
+            payload.minutes,
+            block.start_time if block else None,
+            block.end_time if block else None,
+        )
+        definition = FOCUS_HABITS[habit_key]
+        if block:
+            block.title = definition["label"]
+            block.category = habit_key
+            block.completed = True
+        else:
+            db.add(ScheduleBlock(
+                date=today,
+                start_time=start_time,
+                end_time=end_time,
+                title=definition["label"],
+                category=habit_key,
+                note=marker,
+                completed=True,
+            ))
     db.commit()
-    _sync_habit_schedule_blocks(db, today)
     definition = FOCUS_HABITS[habit_key]
-    status = "done" if payload.minutes >= definition["standard"] else "minimum" if payload.minutes > 0 else "today"
+    completed_minutes = sum(
+        _minutes_between(item.start_time, item.end_time)
+        for item in db.query(ScheduleBlock).filter(
+            ScheduleBlock.date == today,
+            ScheduleBlock.category == habit_key,
+        ).all()
+    )
+    status = (
+        "done" if completed_minutes >= definition["standard"]
+        else "minimum" if completed_minutes >= definition["minimum"]
+        else "today" if _habit_is_due(habit_key, today.weekday())
+        else "off"
+    )
     return FocusHabit(
         key=habit_key, label=definition["label"], icon=definition["icon"], status=status,
         standard_minutes=definition["standard"], minimum_minutes=definition["minimum"],
-        cue=definition["cue"], completed_minutes=payload.minutes,
+        cue=definition["cue"], completed_minutes=completed_minutes,
     )
 
 

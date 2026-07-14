@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.ai_client import chat, parse_json
 from app.database import get_db
-from app.models import DailyLog, HabitCheck, ScheduleBlock
+from app.models import DailyLog, ScheduleBlock
 from app.schemas import DailyLogOut
 
 router = APIRouter(prefix="/soil", tags=["soil"])
@@ -476,8 +476,6 @@ def _schedule_soil_category(block: ScheduleBlock) -> str | None:
 
 
 def _schedule_event(block: ScheduleBlock) -> dict | None:
-    if (block.note or "").startswith("[home-habit:"):
-        return None
     category = _schedule_soil_category(block)
     if not category:
         return None
@@ -490,38 +488,6 @@ def _schedule_event(block: ScheduleBlock) -> dict | None:
         "source_type": "calendar",
         "base_score": SCHEDULE_BASE_SCORE.get(category, 12),
         "default_minutes": 30,
-    }
-
-
-def _manual_event(log: SoilActionLog, defs: dict[int, SoilActionDefinition]) -> dict:
-    definition = defs.get(log.action_definition_id) if log.action_definition_id else None
-    return {
-        "id": log.id,
-        "action_name": log.action_name,
-        "category_key": log.category_key,
-        "performed_on": log.performed_on,
-        "duration_minutes": log.duration_minutes,
-        "source_type": log.source_type or "manual",
-        "base_score": definition.base_score if definition else 12,
-        "default_minutes": definition.default_minutes if definition else None,
-    }
-
-
-def _habit_event(check: HabitCheck) -> dict | None:
-    category = {"meditation": "mind", "reading": "knowledge", "creation": "creation"}.get(check.habit_key)
-    if not category or check.minutes <= 0:
-        return None
-    defaults = {"meditation": 5, "reading": 15, "creation": 30}
-    names = {"meditation": "心を整える", "reading": "知識に触れる", "creation": "創作に触れる"}
-    return {
-        "id": -(1_000_000 + check.id),
-        "action_name": names[check.habit_key],
-        "category_key": category,
-        "performed_on": check.check_date,
-        "duration_minutes": check.minutes,
-        "source_type": "habit",
-        "base_score": SCHEDULE_BASE_SCORE[category],
-        "default_minutes": defaults[check.habit_key],
     }
 
 
@@ -539,26 +505,15 @@ def _event_out(event: dict) -> SoilLogOut:
 
 
 def _soil_events(db: Session, start: date | None = None, end: date | None = None) -> list[dict]:
-    defs = {d.id: d for d in db.query(SoilActionDefinition).all()}
-    manual_query = db.query(SoilActionLog)
     calendar_query = db.query(ScheduleBlock).filter(ScheduleBlock.category != "work")
-    habit_query = db.query(HabitCheck).filter(HabitCheck.minutes > 0)
     if start:
-        manual_query = manual_query.filter(SoilActionLog.performed_on >= start)
         calendar_query = calendar_query.filter(ScheduleBlock.date >= start)
-        habit_query = habit_query.filter(HabitCheck.check_date >= start)
     if end:
-        manual_query = manual_query.filter(SoilActionLog.performed_on <= end)
         calendar_query = calendar_query.filter(ScheduleBlock.date <= end)
-        habit_query = habit_query.filter(HabitCheck.check_date <= end)
 
-    events = [_manual_event(log, defs) for log in manual_query.all() if log.category_key in CATEGORY_KEYS]
+    events = []
     for block in calendar_query.all():
         event = _schedule_event(block)
-        if event:
-            events.append(event)
-    for check in habit_query.all():
-        event = _habit_event(check)
         if event:
             events.append(event)
     return sorted(events, key=lambda item: (item["performed_on"], abs(item["id"])), reverse=True)

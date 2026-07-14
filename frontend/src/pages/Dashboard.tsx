@@ -81,6 +81,7 @@ export default function Dashboard() {
   const [pendingCreation, setPendingCreation] = useState<{ label: string; minutes: number } | null>(null);
   const [showResumePrompt, setShowResumePrompt] = useState(false);
   const [resumeDraft, setResumeDraft] = useState("");
+  const [calendarRevision, setCalendarRevision] = useState(0);
 
   const load = async () => {
     const data = await fetchFocusHome();
@@ -96,6 +97,7 @@ export default function Dashboard() {
     setSaving(true);
     try {
       await updateFocusHabit(habit.key, minutes);
+      setCalendarRevision((revision) => revision + 1);
       setSelectedHabit(null);
       setActionOpen(false);
       await load();
@@ -109,6 +111,7 @@ export default function Dashboard() {
     setSaving(true);
     try {
       await plantSeed(home.action.seed_id);
+      setCalendarRevision((revision) => revision + 1);
       await load();
     } finally {
       setSaving(false);
@@ -120,6 +123,7 @@ export default function Dashboard() {
     setSaving(true);
     try {
       await updateFocusHabit("creation", pendingCreation.minutes);
+      setCalendarRevision((revision) => revision + 1);
       await load();
       setPendingCreation(null);
       setShowResumePrompt(true);
@@ -368,7 +372,7 @@ export default function Dashboard() {
           </div>
           <Link to="/calendar">カレンダーを開く →</Link>
         </header>
-        <Calendar embedded />
+        <Calendar embedded onScheduleChange={load} refreshKey={calendarRevision} />
       </section>
     </main>
   );

@@ -80,7 +80,9 @@ type PositionedBlock = {
   columns: number;
 };
 
-function layoutDayBlocks(blocks: ScheduleBlock[]): PositionedBlock[] {
+const MIN_BLOCK_HEIGHT_PERCENT = 4;
+
+function layoutDayBlocks(blocks: ScheduleBlock[], minimumDisplayMinutes: number): PositionedBlock[] {
   const sorted = [...blocks].sort((a, b) => (
     minutesOf(a.start_time) - minutesOf(b.start_time)
     || minutesOf(a.end_time) - minutesOf(b.end_time)
@@ -91,7 +93,7 @@ function layoutDayBlocks(blocks: ScheduleBlock[]): PositionedBlock[] {
 
   sorted.forEach((block) => {
     const start = minutesOf(block.start_time);
-    const end = minutesOf(block.end_time);
+    const end = Math.max(minutesOf(block.end_time), start + minimumDisplayMinutes);
     if (current.length > 0 && start >= groupEnd) {
       groups.push(current);
       current = [];
@@ -108,7 +110,7 @@ function layoutDayBlocks(blocks: ScheduleBlock[]): PositionedBlock[] {
       const start = minutesOf(block.start_time);
       let column = columnEnds.findIndex((end) => end <= start);
       if (column === -1) column = columnEnds.length;
-      columnEnds[column] = minutesOf(block.end_time);
+      columnEnds[column] = Math.max(minutesOf(block.end_time), start + minimumDisplayMinutes);
       return { block, column };
     });
     const columns = Math.max(1, columnEnds.length);
@@ -130,7 +132,7 @@ function blockStyle(block: ScheduleBlock, schedule: WeekSchedule, column = 0, co
     : { left: "5px", right: "5px", width: "auto" };
   return {
     top: `${Math.max(0, top)}%`,
-    height: `${Math.max(4, height)}%`,
+    height: `${Math.max(MIN_BLOCK_HEIGHT_PERCENT, height)}%`,
     ...horizontal,
   };
 }
@@ -150,7 +152,15 @@ function toPayload(block: ScheduleBlock): ScheduleBlockPayload {
   };
 }
 
-export default function Calendar({ embedded = false }: { embedded?: boolean }) {
+export default function Calendar({
+  embedded = false,
+  onScheduleChange,
+  refreshKey = 0,
+}: {
+  embedded?: boolean;
+  onScheduleChange?: () => void | Promise<void>;
+  refreshKey?: number;
+}) {
   const today = localDate();
   const [tab, setTab] = useState<Tab>("schedule");
   const [weekStart, setWeekStart] = useState(mondayOf(today));
@@ -168,9 +178,14 @@ export default function Calendar({ embedded = false }: { embedded?: boolean }) {
     setSchedule(data);
   };
 
+  const refreshSchedule = async () => {
+    await loadSchedule();
+    await onScheduleChange?.();
+  };
+
   useEffect(() => {
     loadSchedule();
-  }, [weekStart]);
+  }, [weekStart, refreshKey]);
 
   useEffect(() => {
     document.body.dataset.ariaContext = tab === "schedule" ? "calendar-week" : "calendar-growth";
@@ -194,7 +209,7 @@ export default function Calendar({ embedded = false }: { embedded?: boolean }) {
       setEditingId(null);
       setForm({ ...emptyForm, date: payload.date });
       setFormOpen(false);
-      await loadSchedule();
+      await refreshSchedule();
     } finally {
       setSaving(false);
     }
@@ -242,7 +257,7 @@ export default function Calendar({ embedded = false }: { embedded?: boolean }) {
       setEditingId(null);
       setForm({ ...emptyForm, date: today });
       setFormOpen(false);
-      await loadSchedule();
+      await refreshSchedule();
     } finally {
       setSaving(false);
     }
@@ -260,7 +275,7 @@ export default function Calendar({ embedded = false }: { embedded?: boolean }) {
         category: category.key,
         note: null,
       });
-      await loadSchedule();
+      await refreshSchedule();
     } finally {
       setSaving(false);
     }
@@ -289,7 +304,7 @@ export default function Calendar({ embedded = false }: { embedded?: boolean }) {
         start_time: timeTextFromMinutes(start),
         end_time: timeTextFromMinutes(start + duration),
       });
-      await loadSchedule();
+      await refreshSchedule();
     } finally {
       setDraggingId(null);
       setSaving(false);
@@ -341,7 +356,9 @@ export default function Calendar({ embedded = false }: { embedded?: boolean }) {
                 </div>
                 {weekDays.map((day, index) => {
                   const dayBlocks = schedule.blocks.filter((block) => block.date === day);
-                  const positionedBlocks = layoutDayBlocks(dayBlocks);
+                  const displayRangeMinutes = (schedule.day_end_hour - schedule.day_start_hour) * 60;
+                  const minimumDisplayMinutes = displayRangeMinutes * (MIN_BLOCK_HEIGHT_PERCENT / 100);
+                  const positionedBlocks = layoutDayBlocks(dayBlocks, minimumDisplayMinutes);
                   return (
                     <div className="day-col" key={day}>
                       <div className={`day-head ${day === today ? "today" : ""}`}>

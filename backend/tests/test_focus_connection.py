@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 from app.routers.dashboard import (
     FOCUS_HABITS,
+    _category_minutes,
     _connection_state,
     _habit_schedule_marker,
     _habit_schedule_times,
@@ -47,6 +48,16 @@ class ConnectionStateTest(unittest.TestCase):
         self.assertTrue(_seed_is_planted_today(seed, set(), {"creation"}))
         self.assertTrue(_seed_is_planted_today(seed, {42}, set()))
         self.assertFalse(_seed_is_planted_today(seed, set(), {"reading"}))
+
+    def test_habit_minutes_use_exact_calendar_category(self):
+        blocks = [
+            SimpleNamespace(category="creation", start_time=time(20, 0), end_time=time(20, 30)),
+            SimpleNamespace(category="reading", start_time=time(20, 30), end_time=time(21, 0)),
+            SimpleNamespace(category="job_search", start_time=time(21, 0), end_time=time(22, 0)),
+        ]
+        self.assertEqual(_category_minutes(blocks, "creation"), 30)
+        self.assertEqual(_category_minutes(blocks, "reading"), 30)
+        self.assertEqual(_category_minutes(blocks, "meditation"), 0)
 
     def test_touch_today_is_connected(self):
         self.assertEqual(_connection_state("creation", 0, 0), ("今日も接続中", "hot"))
